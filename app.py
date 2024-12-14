@@ -18,6 +18,7 @@ def load_json_data(url):
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"Error loading data from {url}: {e}")
+        return {}
         
 # روابط JSON
 url_telegram_users = "https://script.google.com/macros/s/AKfycbwMF9ajqKdnX7m3caoympN5NxYc3RrSg7VJ5cbuDxQvIrlv9x575LLeitFkrGnN0g4ZiQ/exec"
