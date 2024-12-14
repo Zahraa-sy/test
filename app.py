@@ -57,8 +57,9 @@ def process_name(message):
     user_name = message.from_user.username.strip()
     user_account = message.text.strip()
     
+    # تحقق مما إذا كان الحساب موجودًا
     for account in allowed_names_accounts:
-        if account['username'] == user_name and user_account in account['accounts']:
+        if account['username'].lower() == user_name.lower() and user_account in account['accounts']:
             bot.send_message(message.chat.id, f"شكرًا، {user_name}")
             markup = types.ReplyKeyboardMarkup(row_width=1)
             btn_get_message = types.KeyboardButton('الحصول على الرسالة')
@@ -66,8 +67,9 @@ def process_name(message):
             bot.send_message(message.chat.id, "اضغط على الزر للحصول على الرسالة:", reply_markup=markup)
             return
     
+    # إذا لم يكن الحساب صالحًا، اطلب إعادة المحاولة
     bot.send_message(message.chat.id, "الحساب ليس لك. يرجى إدخال اسم حساب جديد.")
-    bot.register_next_step_handler(message, process_name)
+    # لا تسجل الخطوة هنا، بل اترك المستخدم يرسل رسالة جديدة
 
 @bot.message_handler(content_types=['text'])
 def handle_text(message):
