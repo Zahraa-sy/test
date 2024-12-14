@@ -65,22 +65,23 @@ def process_name(message):
             markup.add(btn_get_message)
             bot.send_message(message.chat.id, "اضغط على الزر للحصول على الرسالة:", reply_markup=markup)
             return
-
-    # إذا لم يكن الحساب صالحًا، اطلب إعادة المحاولة
+#---------
+ # إذا لم يكن الحساب صالحًا، اطلب إعادة المحاولة
     bot.send_message(message.chat.id, "الحساب ليس لك. يرجى إدخال اسم حساب جديد.")
-        # إعادة عرض زر البداية لإعادة المحاولة
+    # إعادة عرض زر البداية لإعادة المحاولة
     markup = types.ReplyKeyboardMarkup(row_width=1)
     start_button = types.KeyboardButton('بدء')
     markup.add(start_button)
     bot.send_message(message.chat.id, "يرجى الضغط على الزر أدناه لإعادة المحاولة:", reply_markup=markup)
     
-    # التسجيل للخطوة التالية
+    # تسجيل الرد على الزر 'بدء'
+    @bot.message_handler(func=lambda message: message.text == 'بدء')
     def start_again(message):
-        bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب")
-        bot.register_next_step_handler(message, process_name)
+        bot.send_message(message.chat.id, "يرجى إدخال اسم حسابك.")
+        bot.send_message(message.chat.id, "استخدم الأمر /start لإعادة البدء.")
+        bot.register_next_step_handler(message, start_message)
 
-    bot.register_next_step_handler(message, start_again)
-
+#-------
 @bot.message_handler(content_types=['text'])
 def handle_text(message):
     user_name = message.from_user.username.strip()
