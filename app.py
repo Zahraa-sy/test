@@ -9,6 +9,14 @@ bot = telebot.TeleBot(TOKEN)
 
 # Flask app
 app = Flask(__name__)
+# إعداد مسار Webhook
+@app.route('/' + TOKEN, methods=['POST'])
+def webhook():
+    json_string = request.get_data().decode('utf-8')
+    print("Received update:", json_string)  # طباعة التحديثات المستلمة
+    update = telebot.types.Update.de_json(json_string)
+    bot.process_new_updates([update])
+    return '', 200
 
 # Function to load JSON data from a URL
 def load_json_data(url):
@@ -104,13 +112,6 @@ def handle_text(message):
         else:
             bot.send_message(message.chat.id, "ليس لديك رسائل.")
 
-# إعداد مسار Webhook
-@app.route('/' + TOKEN, methods=['POST'])
-def webhook():
-    json_string = request.get_data().decode('utf-8')
-    update = telebot.types.Update.de_json(json_string)
-    bot.process_new_updates([update])
-    return '', 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
