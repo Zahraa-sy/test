@@ -44,8 +44,7 @@ allowed_names_accounts = data_allowed_names.get('allowed_names', [])
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    telegram_username = message.from_user.username.strip()
-    
+    telegram_username = message.from_user.username.strip()  
     if telegram_username in telegram_users:
         bot.send_message(message.chat.id, "مرحبًا بك في البوت!")
         bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب")
@@ -69,12 +68,10 @@ def process_name(message):
 
     # إذا لم يكن الحساب صالحًا، اطلب إعادة المحاولة
     bot.send_message(message.chat.id, "الحساب ليس لك. يرجى إدخال اسم حساب جديد.")
-    
-    # إعادة عرض زر البداية لإعادة المحاولة
+        # إعادة عرض زر البداية لإعادة المحاولة
     markup = types.ReplyKeyboardMarkup(row_width=1)
     start_button = types.KeyboardButton('بدء')
     markup.add(start_button)
-    
     bot.send_message(message.chat.id, "يرجى الضغط على الزر أدناه لإعادة المحاولة:", reply_markup=markup)
     
     # التسجيل للخطوة التالية
