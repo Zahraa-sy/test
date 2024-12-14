@@ -12,10 +12,13 @@ app = Flask(__name__)
 
 # Function to load JSON data from a URL
 def load_json_data(url):
-    response = requests.get(url)
-    response.raise_for_status()
-    return response.json()
-
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an error for bad responses
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error loading data from {url}: {e}")
+        
 # روابط JSON
 url_telegram_users = "https://script.google.com/macros/s/AKfycbwMF9ajqKdnX7m3caoympN5NxYc3RrSg7VJ5cbuDxQvIrlv9x575LLeitFkrGnN0g4ZiQ/exec"
 url_allowed_names = "https://script.google.com/macros/s/AKfycbyLB7vThO7b5YOYn8dJS6iIM1DPHBXy51NNOa9qGPKYKz6X_eixIxEYqY5EKCw57KpyVg/exec"
