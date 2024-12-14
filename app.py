@@ -14,12 +14,12 @@ app = Flask(__name__)
 def load_json_data(url):
     try:
         response = requests.get(url)
-        response.raise_for_status()  # Raise an error for bad responses
+        response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"Error loading data from {url}: {e}")
         return {}
-        
+
 # روابط JSON
 url_telegram_users = "https://script.google.com/macros/s/AKfycbwMF9ajqKdnX7m3caoympN5NxYc3RrSg7VJ5cbuDxQvIrlv9x575LLeitFkrGnN0g4ZiQ/exec"
 url_allowed_names = "https://script.google.com/macros/s/AKfycbyLB7vThO7b5YOYn8dJS6iIM1DPHBXy51NNOa9qGPKYKz6X_eixIxEYqY5EKCw57KpyVg/exec"
@@ -27,20 +27,12 @@ url_extract_messages = "https://script.google.com/macros/s/AKfycbwzC864OmqKdb76i
 url_messages = "https://script.google.com/macros/s/AKfycbwzC864OmqKdb76i12j2-b6heUKSu6nhGqrRZuB-KaidsopI-ICI8_pWTehmHJFA6LC7Q/exec?action=getFirstTenMessages"
 
 # تحميل أسماء مستخدمي تيليجرام
-try:
-    data_telegram_users = load_json_data(url_telegram_users)
-    telegram_users = [item['username'] for item in data_telegram_users['telegram_users']]
-except Exception as e:
-    telegram_users = []
-    print(f"Error loading telegram users: {e}")
+data_telegram_users = load_json_data(url_telegram_users)
+telegram_users = [item['username'] for item in data_telegram_users.get('telegram_users', [])]
 
 # تحميل الأسماء المصرح بها
-try:
-    data_allowed_names = load_json_data(url_allowed_names)
-    allowed_names_accounts = data_allowed_names['allowed_names']
-except Exception as e:
-    allowed_names_accounts = []
-    print(f"Error loading allowed names: {e}")
+data_allowed_names = load_json_data(url_allowed_names)
+allowed_names_accounts = data_allowed_names.get('allowed_names', [])
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -96,28 +88,23 @@ def handle_text(message):
         'مهم: كيفية تحديث السكن الذي يستخدم Netflix',
         'رمز الوصول المؤقت من Netflix'
     ]:
-        try:
-            data_messages = load_json_data(url_messages)
-            messages_data = data_messages['messages']
-            user_messages = [item for item in messages_data if item['to'] == user_account]
-            
-            if user_messages:
-                relevant_messages = [item for item in user_messages if item['subject'] == message.text]
-                if relevant_messages:
-                    latest_relevant_message = relevant_messages[-1]
-                    bot.send_message(message.chat.id, f"{latest_relevant_message['body']}\n{latest_relevant_message['date']}")
-                else:
-                    bot.send_message(message.chat.id, "ليس لديك رسالة بالعنوان المطلوب.")
+        data_messages = load_json_data(url_messages)
+        messages_data = data_messages.get('messages', [])
+        user_account = message.text.strip()
+        
+        user_messages = [item for item in messages_data if item['to'] == user_account]
+        
+        if user_messages:
+            relevant_messages = [item for item in user_messages if item['subject'] == message.text]
+            if relevant_messages:
+                latest_relevant_message = relevant_messages[-1]
+                bot.send_message(message.chat.id, f"{latest_relevant_message['body']}\n{latest_relevant_message['date']}")
             else:
-                bot.send_message(message.chat.id, "ليس لديك رسائل.")
-        except Exception as e:
-            bot.send_message(message.chat.id, f"حدث خطأ أثناء تحميل الرسائل: {e}")
+                bot.send_message(message.chat.id, "ليس لديك رسالة بالعنوان المطلوب.")
+        else:
+            bot.send_message(message.chat.id, "ليس لديك رسائل.")
 
 # إعداد مسار Webhook
-from flask import Flask, request
-
-app = Flask(__name__)
-
 @app.route('/' + TOKEN, methods=['POST'])
 def webhook():
     json_string = request.get_data().decode('utf-8')
