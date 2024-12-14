@@ -1,10 +1,14 @@
 import telebot
 import requests
 from telebot import types
+from flask import Flask, request
 
 # توكن البوت
 TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
 bot = telebot.TeleBot(TOKEN)
+
+# Flask app
+app = Flask(__name__)
 
 # Function to load JSON data from a URL
 def load_json_data(url):
@@ -105,5 +109,17 @@ def handle_text(message):
         except Exception as e:
             bot.send_message(message.chat.id, f"حدث خطأ أثناء تحميل الرسائل: {e}")
 
+# إعداد مسار Webhook
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route('/' + TOKEN, methods=['POST'])
+def webhook():
+    json_string = request.get_data().decode('utf-8')
+    update = telebot.types.Update.de_json(json_string)
+    bot.process_new_updates([update])
+    return '', 200
+
 if __name__ == '__main__':
-    bot.polling(none_stop=True)
+    app.run(host='0.0.0.0', port=5000)
