@@ -31,8 +31,8 @@ def load_json_data(url):
 # روابط JSON
 url_telegram_users = "https://script.google.com/macros/s/AKfycbwMF9ajqKdnX7m3caoympN5NxYc3RrSg7VJ5cbuDxQvIrlv9x575LLeitFkrGnN0g4ZiQ/exec"
 url_allowed_names = "https://script.google.com/macros/s/AKfycbyLB7vThO7b5YOYn8dJS6iIM1DPHBXy51NNOa9qGPKYKz6X_eixIxEYqY5EKCw57KpyVg/exec"
-url_extract_messages = "https://script.google.com/macros/s/AKfycbwzC864OmqKdb76i12j2-b6heUKSu6nhGqrRZuB-KaidsopI-ICI8_pWTehmHJFA6LC7Q/exec?action=importLatestMessagesFromToday"
-url_messages = "https://script.google.com/macros/s/AKfycbwzC864OmqKdb76i12j2-b6heUKSu6nhGqrRZuB-KaidsopI-ICI8_pWTehmHJFA6LC7Q/exec?action=getFirstTenMessages"
+url_extract_messages = "https://script.google.com/macros/s/AKfycbxC1w62816BdFDUqtqE-vkiWUFAYfLxQBgFOLjtpfJlY9XJM6o1SngacEbj21PmDpbMNA/exec?action=importLatestMessagesFromToday"
+url_messages = "https://script.google.com/macros/s/AKfycbxC1w62816BdFDUqtqE-vkiWUFAYfLxQBgFOLjtpfJlY9XJM6o1SngacEbj21PmDpbMNA/exec?action=getFirstTenMessages"
 
 # تحميل أسماء مستخدمي تيليجرام
 data_telegram_users = load_json_data(url_telegram_users)
