@@ -20,7 +20,7 @@ def load_json_data(url):
 
 # روابط JSON
 url_telegram_users = "https://script.google.com/macros/s/AKfycbwMF9ajqKdnX7m3caoympN5NxYc3RrSg7VJ5cbuDxQvIrlv9x575LLeitFkrGnN0g4ZiQ/exec"
-url_allowed_names = "https://script.google.com/macros/s/AKfycbyLB7vThO7b5YOYn8dJS6iIM1DPHBXy51NNOa9qGPKYKz6X_eixIxEYqY5EKCw57KpyVg/exec"                        
+url_allowed_names = "https://script.google.com/macros/s/AKfycbw-qAq-mQM5dg5WmpwOteTEM3ve83deK-yiVPMFofj_xvCEIzp47U8zKeaeHP0J6pWslA/exec"                        
 url_extract_messages = "https://script.google.com/macros/s/AKfycbxC1w62816BdFDUqtqE-vkiWUFAYfLxQBgFOLjtpfJlY9XJM6o1SngacEbj21PmDpbMNA/exec?action=importLatestMessagesFromToday"
 url_messages = "https://script.google.com/macros/s/AKfycbxC1w62816BdFDUqtqE-vkiWUFAYfLxQBgFOLjtpfJlY9XJM6o1SngacEbj21PmDpbMNA/exec?action=getFirstTenMessages"
 
