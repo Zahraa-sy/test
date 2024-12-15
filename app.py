@@ -43,6 +43,7 @@ def start_message(message):
         bot.send_message(message.chat.id, "غير مصرح لك للاستخدام هذا البوت.")
 
 def process_name(message):
+    global user_name, user_account
     user_name = message.from_user.username.strip()
     user_account = message.text.strip()
     
