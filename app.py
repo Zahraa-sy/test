@@ -4,12 +4,12 @@ from telebot import types
 from flask import Flask, request
 
 # توكن البوت
-BOT_TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
-bot = telebot.TeleBot(BOT_TOKEN)
+TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
+bot = telebot.TeleBot(TOKEN)
 
 app = Flask(__name__)
 
-@app.route('/{}'.format(BOT_TOKEN), methods=['POST'])
+@app.route('/{}'.format(TOKEN), methods=['POST'])
 def webhook():
     update = telebot.types.Update.de_json(request.get_json(force=True), bot)
     bot.process_new_updates([update])
@@ -27,7 +27,7 @@ def load_json_data(url):
 
 # روابط JSON
 url_telegram_users = "https://script.google.com/macros/s/AKfycbwMF9ajqKdnX7m3caoympN5NxYc3RrSg7VJ5cbuDxQvIrlv9x575LLeitFkrGnN0g4ZiQ/exec"
-url_allowed_names = "https://script.google.com/macros/s/AKfycbyLB7vThO7b5YOYn8dJS6iIM1DPHBXy51NNOa9qGPKYKz6X_eixIxEYqY5EKCw57KpyVg/exec"
+url_allowed_names = "https://script.google.com/macros/s/AKfycbyLB7vThO7b5YOYn8dJS6iIM1DPHBXy51NNOa9qGPKYKz6X_eixIxEYqY5EKCw57KpyVg/exec"                        
 url_extract_messages = "https://script.google.com/macros/s/AKfycbxC1w62816BdFDUqtqE-vkiWUFAYfLxQBgFOLjtpfJlY9XJM6o1SngacEbj21PmDpbMNA/exec?action=importLatestMessagesFromToday"
 url_messages = "https://script.google.com/macros/s/AKfycbxC1w62816BdFDUqtqE-vkiWUFAYfLxQBgFOLjtpfJlY9XJM6o1SngacEbj21PmDpbMNA/exec?action=getFirstTenMessages"
 
@@ -112,5 +112,7 @@ def handle_text(message):
         else:
             bot.send_message(message.chat.id, "ليس لديك رسائل.")
 
-if __name__ == '__main__':    
+
+if __name__ == '__main__':
+    
     app.run(host='0.0.0.0', port=5000)
