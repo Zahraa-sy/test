@@ -45,10 +45,10 @@ def start_message(message):
 def process_name(message):
     global user_name, user_account
     user_name = message.from_user.username.strip()
-    user_account = message.text.strip()
-    
-    # تحقق مما إذا كان الحساب موجودًا
+    user_account = message.text.strip()    
+    # تحقق مما إذا كان الحساب موجودًا     
     for account in allowed_names_accounts:
+        print(f"Comparing {user_name} with {account['username']} and {user_account} with {account['accounts']}")
         if account['username'].lower() == user_name.lower() and user_account in account['accounts']:
             bot.send_message(message.chat.id, f"شكرًا، {user_name}")
             markup = types.ReplyKeyboardMarkup(row_width=1)
@@ -56,12 +56,10 @@ def process_name(message):
             markup.add(btn_get_message)
             bot.send_message(message.chat.id, "اضغط على الزر للحصول على الرسالة:", reply_markup=markup)
             return
-#---------
-    # إذا لم يكن الحساب صالحًا، اطلب إعادة المحاولة
-    bot.send_message(message.chat.id, "الحساب ليس لك. يرجى إدخال اسم حساب جديد.")
-    bot.send_message(message.chat.id, "يرجى استخدام الأمر /start لإعادة البدء.")
-    #  المستخدم يستخدم الأمر /start لإعادة البدء
 
+    if not user_name or not user_account:
+        bot.send_message(message.chat.id, "الحساب ليس لك. يرجى إدخال اسم حساب جديد.")
+        return
 #-------
 @bot.message_handler(content_types=['text'])
 def handle_text(message):
