@@ -7,15 +7,16 @@ from flask import Flask, request
 TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
 bot = telebot.TeleBot(TOKEN)
 
+# Flask app
 app = Flask(__name__)
-#المسار
+# إعداد مسار Webhook
 @app.route('/' + TOKEN, methods=['POST'])
-def webhook():    
+def webhook():
     json_string = request.get_data().decode('utf-8')
     print("Received update:", json_string)  # طباعة التحديثات المستلمة
-    update = telebot.types.Update.de_json(request.get_json(force=True), bot)
+    update = telebot.types.Update.de_json(json_string)
     bot.process_new_updates([update])
-    return ' ', 200
+    return '', 200
 
 # Function to load JSON data from a URL
 def load_json_data(url):
