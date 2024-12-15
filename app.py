@@ -112,7 +112,7 @@ def handle_text(message):
     ]:
         data_messages = load_json_data(url_messages)
         if data_messages is None:
-            bot.send_message(message.chat.id, "فشل في تحميل البيانات JSON.")
+            bot.send_message(message.chat.id, "فشل في تحميل البيانات.")
             return
         messages_data = data_messages.get('messages', [])
         user_account = message.text.strip()        
