@@ -13,7 +13,7 @@ app = Flask(__name__)
 def webhook():
     update = telebot.types.Update.de_json(request.get_json(force=True), bot)
     bot.process_new_updates([update])
-    return "OK", 200
+    return ' ', 200
 
 # Function to load JSON data from a URL
 def load_json_data(url):
