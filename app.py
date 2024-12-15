@@ -10,7 +10,9 @@ bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 #المسار
 @app.route('/' + TOKEN, methods=['POST'])
-def webhook():
+def webhook():    
+    json_string = request.get_data().decode('utf-8')
+    print("Received update:", json_string)  # طباعة التحديثات المستلمة
     update = telebot.types.Update.de_json(request.get_json(force=True), bot)
     bot.process_new_updates([update])
     return ' ', 200
