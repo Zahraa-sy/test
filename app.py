@@ -4,19 +4,16 @@ from telebot import types
 from flask import Flask, request
 
 # توكن البوت
-TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
-bot = telebot.TeleBot(TOKEN)
+BOT_TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
+bot = telebot.TeleBot(BOT_TOKEN)
 
-# Flask app
 app = Flask(__name__)
-# إعداد مسار Webhook
-@app.route('/' + TOKEN, methods=['POST'])
+
+@app.route('/{}'.format(BOT_TOKEN), methods=['POST'])
 def webhook():
-    json_string = request.get_data().decode('utf-8')
-    print("Received update:", json_string)  # طباعة التحديثات المستلمة
-    update = telebot.types.Update.de_json(json_string)
+    update = telebot.types.Update.de_json(request.get_json(force=True), bot)
     bot.process_new_updates([update])
-    return '', 200
+    return "OK", 200
 
 # Function to load JSON data from a URL
 def load_json_data(url):
@@ -115,6 +112,5 @@ def handle_text(message):
         else:
             bot.send_message(message.chat.id, "ليس لديك رسائل.")
 
-
-if __name__ == '__main__':
+if __name__ == '__main__':    
     app.run(host='0.0.0.0', port=5000)
