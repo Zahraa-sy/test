@@ -34,7 +34,7 @@ def load_json_data_from_file(file_path):
         return json.load(json_file)
 
 # Load allowed names from the JSON file
-allowed_names_file_path = 'test/allowed_names.json'
+allowed_names_file_path = 'allowed_names.json'
 data_allowed_names = load_json_data_from_file(allowed_names_file_path)
 allowed_names_accounts = data_allowed_names.get('allowed_names', [])
 
