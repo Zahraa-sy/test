@@ -20,7 +20,6 @@ def load_json_data(url):
 
 # روابط JSON
 url_telegram_users = "https://script.google.com/macros/s/AKfycbwMF9ajqKdnX7m3caoympN5NxYc3RrSg7VJ5cbuDxQvIrlv9x575LLeitFkrGnN0g4ZiQ/exec"
-url_allowed_names = "https://script.google.com/macros/s/AKfycbys-RD07ry6FbYD3vy91Dhr6Zb3xQdZwBjSRuNk7FLhVO72c8K7z13U3C7iVMQkN03wDQ/exec"                        
 url_extract_messages = "https://script.google.com/macros/s/AKfycbxC1w62816BdFDUqtqE-vkiWUFAYfLxQBgFOLjtpfJlY9XJM6o1SngacEbj21PmDpbMNA/exec?action=importLatestMessagesFromToday"
 url_messages = "https://script.google.com/macros/s/AKfycbxC1w62816BdFDUqtqE-vkiWUFAYfLxQBgFOLjtpfJlY9XJM6o1SngacEbj21PmDpbMNA/exec?action=getFirstTenMessages"
 
@@ -29,7 +28,13 @@ data_telegram_users = load_json_data(url_telegram_users)
 telegram_users = [item['username'] for item in data_telegram_users.get('telegram_users', [])]
 
 # تحميل الأسماء المصرح بها
-data_allowed_names = load_json_data(url_allowed_names)
+def load_json_data_from_file(file_path):
+    with open(file_path, 'r') as json_file:
+        return json.load(json_file)
+
+# Load allowed names from the JSON file
+allowed_names_file_path = 'allowed_names.json'
+data_allowed_names = load_json_data_from_file(allowed_names_file_path)
 allowed_names_accounts = data_allowed_names.get('allowed_names', [])
 
 @bot.message_handler(commands=['start'])
