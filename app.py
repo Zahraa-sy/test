@@ -23,7 +23,7 @@ IMAP_SERVER = "imap.gmail.com"
 OWNER_USERNAME = "owner_username"
 
 # روابط البيانات
-URL_TELEGRAM_USERS = "https://example.com/telegram_users.json"
+URL_TELEGRAM_USERS = "https://github.com/Zahraa-sy/test/blob/main/allowed_names.json"
 
 # تحميل بيانات مستخدمي تيليجرام
 def load_json_data(url):
