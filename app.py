@@ -15,8 +15,8 @@ bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
 # بيانات البريد الإلكتروني
-EMAIL = "your_email@gmail.com"
-PASSWORD = "your_app_password"
+EMAIL = "azal12345zz@gmail.com"
+PASSWORD = "pbnr pihp anhm vlxp"
 IMAP_SERVER = "imap.gmail.com"
 
 # حساب مالك البوت الأساسي
