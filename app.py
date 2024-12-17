@@ -20,10 +20,11 @@ PASSWORD = "pbnr pihp anhm vlxp"
 IMAP_SERVER = "imap.gmail.com"
 
 # مالك البوت
-OWNER_USERNAME = "Ray2ak"
+OWNER_USERNAME = "flix511"
 
 # المستخدمون المصرح لهم وحساباتهم
 allowed_users = {
+      "flix511": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me"],
     "Ray2ak": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me"],
     "Lamak_8": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me"],
     "flix511": ["e2@flix1.me"],
