@@ -31,37 +31,42 @@ user_accounts = {}
 # دالة لتنظيف النص من الأحرف غير المرئية
 def clean_text(text):
     return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
-
-# دالة لجلب الرسائل من البريد الإلكتروني
-def fetch_emails(search_subject):
+def fetch_emails(search_subjects):
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
         mail.login(EMAIL, PASSWORD)
         mail.select("inbox")
 
-        result, data = mail.search(None, '(SUBJECT "{}")'.format(search_subject))
+        result, data = mail.search(None, "ALL")
         mail_ids = data[0].split()
 
-        if not mail_ids:
-            return "لم يتم العثور على رسائل بالموضوع المطلوب."
+        messages = []
+        for mail_id in mail_ids[-20:]:
+            result, msg_data = mail.fetch(mail_id, "(RFC822)")
+            raw_email = msg_data[0][1]
+            msg = email.message_from_bytes(raw_email)
 
-        latest_email_id = mail_ids[-1]
-        result, msg_data = mail.fetch(latest_email_id, "(RFC822)")
-        raw_email = msg_data[0][1]
-        msg = email.message_from_bytes(raw_email)
+            subject, encoding = decode_header(msg["Subject"])[0]
+            if isinstance(subject, bytes):
+                subject = subject.decode(encoding if encoding else "utf-8")
 
-        subject, encoding = decode_header(msg["Subject"])[0]
-        if isinstance(subject, bytes):
-            subject = subject.decode(encoding if encoding else "utf-8")
+            date = msg["Date"]
 
-        payload = msg.get_payload(decode=True).decode()
-        date = msg["Date"]
+            # فك ترميز المحتوى باستخدام UTF-8
+            payload = msg.get_payload(decode=True)
+            if payload:
+                payload = payload.decode('utf-8', errors='ignore')  # استخدام UTF-8 مع تجاهل الأخطاء
+
+            # البحث في الموضوع
+            if any(keyword in subject for keyword in search_subjects):
+                messages.append(f"{subject}\n{date}\n{payload}")
 
         mail.logout()
-        return f"الموضوع: {subject}\nالتاريخ: {date}\nالمحتوى:\n{payload}"
+        return messages
 
     except Exception as e:
-        return f"حدث خطأ أثناء جلب الرسائل: {e}"
+        return [f"Error fetching emails: {e}"]
+
 
 # بدء البوت
 @bot.message_handler(commands=['start'])
