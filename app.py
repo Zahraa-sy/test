@@ -60,13 +60,17 @@ def fetch_emails(account, subject_keywords, extract_type):
                     if part.get_content_type() == "text/html":
                         html_content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
                         soup = BeautifulSoup(html_content, 'html.parser')
-                        
-                        # استخراج الرابط من زر أو نص معين حسب نوع الطلب
-                        if extract_type == "link":
-                            link = soup.find('a', href=True)
-                            if link:
-                                return link['href']
-                        elif extract_type == "code":
+
+                        # طباعة محتوى HTML لمعاينة ما يتم جلبه
+                        print(html_content)
+
+                        # استخراج الرابط من الأزرار
+                        links = [a['href'] for a in soup.find_all('a', href=True)]
+                        if links:
+                            return '\n'.join(links)
+
+                        # استخراج الرمز المكون من 4 إلى 6 أرقام
+                        if extract_type == "code":
                             code_match = re.search(r'\b\d{4,6}\b', soup.get_text())
                             if code_match:
                                 return code_match.group(0)
