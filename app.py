@@ -21,7 +21,7 @@ IMAP_SERVER = "imap.gmail.com"
 # حساب مالك البوت الأساسي
 OWNER_USERNAME = "owner_username"
 
-# روابط البيانات (ملف JSON مباشر)
+# روابط البيانات
 URL_TELEGRAM_USERS = "https://raw.githubusercontent.com/Zahraa-sy/test/main/allowed_names.json"
 
 # تحميل بيانات المستخدمين المسموح بهم
@@ -35,7 +35,7 @@ def load_json_data(url):
         return {}
 
 data = load_json_data(URL_TELEGRAM_USERS)
-allowed_users = {user['username'].strip(): user['accounts'] for user in data.get("allowed_names", []) if user['username'].strip()}
+allowed_users = {user['username'].strip(): [account.strip().lower() for account in user['accounts']] for user in data.get("allowed_names", [])}
 
 # قائمة مؤقتة لتخزين الحساب المدخل لكل مستخدم
 user_accounts = {}
@@ -84,8 +84,8 @@ def start_message(message):
 
 def process_account_name(message):
     user_name = message.from_user.username.strip()
-    account_name = message.text.strip()
-    
+    account_name = message.text.strip().lower()  # تحويل إلى أحرف صغيرة
+
     if account_name in allowed_users[user_name]:
         user_accounts[user_name] = account_name
         markup = types.ReplyKeyboardMarkup(row_width=1)
