@@ -34,7 +34,6 @@ user_accounts = {}
 # دالة لتنظيف النص
 def clean_text(text):
     return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
-
 def fetch_emails(search_subjects):
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
@@ -56,12 +55,23 @@ def fetch_emails(search_subjects):
 
             date = msg["Date"]
 
-            # فك ترميز المحتوى باستخدام UTF-8 مع التحقق من أن payload ليس None
-            payload = msg.get_payload(decode=True)
+            # التعامل مع الرسائل متعددة الأجزاء
+            payload = None
+            if msg.is_multipart():
+                for part in msg.walk():
+                    content_type = part.get_content_type()
+                    content_disposition = str(part.get("Content-Disposition"))
+                    if content_type == "text/plain" and "attachment" not in content_disposition:
+                        payload = part.get_payload(decode=True)
+                        break
+            else:
+                payload = msg.get_payload(decode=True)
+
+            # فك ترميز المحتوى إذا كان موجودًا
             if payload:
                 payload = payload.decode('utf-8', errors='ignore')
             else:
-                payload = "لا يوجد محتوى في الرسالة."
+                payload = "لا يوجد محتوى نصي في الرسالة."
 
             # البحث في الموضوع
             if any(keyword in subject for keyword in search_subjects):
