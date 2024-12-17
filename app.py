@@ -18,20 +18,23 @@ EMAIL = "azal12345zz@gmail.com"
 PASSWORD = "pbnr pihp anhm vlxp"
 IMAP_SERVER = "imap.gmail.com"
 
+# المستخدمون المصرح بهم وحساباتهم
 allowed_users = {
     "Ray2ak": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me"],
-    
     "Lamak_8": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me"],
     "flix511": ["e2@flix1.me"],
     "ZahraaKhabbaz": ["e2@flix1.me"]
 }
 
-user_accounts = {}
+# حساب مالك البوت الأساسي
+OWNER_USERNAME = "Ray2ak"
 
-# دالة لتنظيف النص من الأحرف غير المرئية
+# تنظيف النص من الأحرف غير المرئية
 def clean_text(text):
     return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
-def fetch_emails(search_subjects):
+
+# دالة لجلب الرسائل من البريد الإلكتروني
+def fetch_emails(search_keywords):
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
         mail.login(EMAIL, PASSWORD)
@@ -52,28 +55,23 @@ def fetch_emails(search_subjects):
 
             date = msg["Date"]
 
-            # فك ترميز المحتوى باستخدام UTF-8
             payload = msg.get_payload(decode=True)
             if payload:
-                payload = payload.decode('utf-8', errors='ignore')  # استخدام UTF-8 مع تجاهل الأخطاء
+                payload = payload.decode('utf-8', errors='ignore')
 
-            # البحث في الموضوع
-            if any(keyword in subject for keyword in search_subjects):
+            if any(keyword in subject for keyword in search_keywords):
                 messages.append(f"{subject}\n{date}\n{payload}")
 
         mail.logout()
-        return messages
-
+        return messages if messages else ["لا توجد رسائل مطابقة."]
     except Exception as e:
-        return [f"Error fetching emails: {e}"]
-
+        return [f"حدث خطأ أثناء جلب الرسائل: {e}"]
 
 # بدء البوت
 @bot.message_handler(commands=['start'])
 def start_message(message):
     telegram_username = clean_text(message.from_user.username)
-
-    if telegram_username in allowed_users:
+    if telegram_username in allowed_users or telegram_username == OWNER_USERNAME:
         bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
         bot.register_next_step_handler(message, process_account_name)
     else:
@@ -83,7 +81,7 @@ def process_account_name(message):
     user_name = clean_text(message.from_user.username)
     account_name = clean_text(message.text)
 
-    if account_name in allowed_users.get(user_name, []):
+    if user_name == OWNER_USERNAME or account_name in allowed_users.get(user_name, []):
         user_accounts[user_name] = account_name
         markup = types.ReplyKeyboardMarkup(row_width=1)
         btn1 = types.KeyboardButton('طلب رابط تحديث السكن')
@@ -95,17 +93,23 @@ def process_account_name(message):
         bot.send_message(message.chat.id, "اسم الحساب غير موجود ضمن الحسابات المصرح بها. حاول مرة أخرى:")
         bot.register_next_step_handler(message, process_account_name)
 
-# التعامل مع خيارات الأزرار
+# التعامل مع الطلبات
 @bot.message_handler(func=lambda message: message.text in ['طلب رابط تحديث السكن', 'طلب رمز السكن', 'طلب استعادة كلمة المرور'])
 def handle_requests(message):
-    if message.text == 'طلب رابط تحديث السكن':
-        response = fetch_emails("تحديث السكن")
-    elif message.text == 'طلب رمز السكن':
-        response = fetch_emails("رمز السكن")
-    elif message.text == 'طلب استعادة كلمة المرور':
-        response = fetch_emails("استعادة كلمة المرور")
+    user_name = clean_text(message.from_user.username)
+    if user_name not in user_accounts:
+        bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب أولاً باستخدام /start.")
+        return
 
-    bot.send_message(message.chat.id, response)
+    if message.text == 'طلب رابط تحديث السكن':
+        emails = fetch_emails(["مهم: كيفية تحديث السكن"])
+    elif message.text == 'طلب رمز السكن':
+        emails = fetch_emails(["Your Netflix temporary access code"])
+    elif message.text == 'طلب استعادة كلمة المرور':
+        emails = fetch_emails(["استكمل طلب إعادة تعيين كلمة المرور الخاصة بك"])
+
+    for email_content in emails:
+        bot.send_message(message.chat.id, email_content)
 
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
