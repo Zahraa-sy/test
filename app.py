@@ -60,13 +60,14 @@ def fetch_emails(account, subject_keywords, extract_type):
                     if part.get_content_type() == "text/html":
                         html_content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
                         soup = BeautifulSoup(html_content, 'html.parser')
-
-                        # استخراج الرابط أو الرمز حسب نوع العملية
+                        
+                        # استخراج الرابط من زر أو نص معين حسب نوع الطلب
                         if extract_type == "link":
-                            for a in soup.find_all('a', href=True):
-                                return a['href']
+                            link = soup.find('a', href=True)
+                            if link:
+                                return link['href']
                         elif extract_type == "code":
-                            code_match = re.search(r'\b\d{4}\b', soup.get_text())
+                            code_match = re.search(r'\b\d{4,6}\b', soup.get_text())
                             if code_match:
                                 return code_match.group(0)
 
@@ -74,6 +75,7 @@ def fetch_emails(account, subject_keywords, extract_type):
 
     except Exception as e:
         return f"Error fetching emails: {e}"
+
 
 # بدء البوت
 @bot.message_handler(commands=['start'])
