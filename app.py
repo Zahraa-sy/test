@@ -26,100 +26,116 @@ allowed_users = {
     "ZahraaKhabbaz": ["e2@flix1.me"]
 }
 
+# مالك البوت
+OWNER_USERNAME = "Ray2ak"
+
 user_accounts = {}
 
-# دالة لسحب رسائل البريد الإلكتروني
-def fetch_emails(search_keywords):
+# دالة لتنظيف النص
+def clean_text(text):
+    return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
+
+# دالة لجلب رسائل البريد الإلكتروني بناءً على الحساب
+def fetch_emails(search_subjects, content_patterns, user_email):
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
         mail.login(EMAIL, PASSWORD)
         mail.select("inbox")
 
         result, data = mail.search(None, "ALL")
-        if result != 'OK':
-            return ["فشل في البحث عن الرسائل."]
-
         mail_ids = data[0].split()
-        if not mail_ids:
-            return ["لا توجد رسائل في البريد الوارد."]
 
         messages = []
-        for mail_id in mail_ids[-20:]:
+        for mail_id in mail_ids[-50:]:
             result, msg_data = mail.fetch(mail_id, "(RFC822)")
-            if result != 'OK':
-                continue
-
             raw_email = msg_data[0][1]
             msg = email.message_from_bytes(raw_email)
+
+            # التحقق من عنوان البريد الإلكتروني للمستلم
+            to_email = msg["To"]
+            if user_email not in to_email:
+                continue
 
             subject, encoding = decode_header(msg["Subject"])[0]
             if isinstance(subject, bytes):
                 subject = subject.decode(encoding if encoding else "utf-8")
 
-            date = msg["Date"]
-
-            payload = msg.get_payload(decode=True)
-            if payload:
-                payload = payload.decode('utf-8', errors='ignore')
-
-            if any(keyword in subject for keyword in search_keywords):
-                messages.append(f"{subject}\n{date}\n{payload}")
+            if any(keyword in subject for keyword in search_subjects):
+                payload = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
+                for pattern in content_patterns:
+                    match = re.search(pattern, payload)
+                    if match:
+                        messages.append(match.group(1))
 
         mail.logout()
-        return messages if messages else ["لا توجد رسائل مطابقة."]
+        return messages
+
     except Exception as e:
-        return [f"حدث خطأ أثناء جلب الرسائل: {e}"]
+        return [f"Error fetching emails: {e}"]
 
 # بدء البوت
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    telegram_username = message.from_user.username
+    telegram_username = clean_text(message.from_user.username)
 
-    if telegram_username in allowed_users:
+    if telegram_username in allowed_users or telegram_username == OWNER_USERNAME:
         bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
         bot.register_next_step_handler(message, process_account_name)
     else:
         bot.send_message(message.chat.id, "غير مصرح لك باستخدام هذا البوت.")
 
 def process_account_name(message):
-    user_name = message.from_user.username
-    account_name = message.text
+    user_name = clean_text(message.from_user.username)
+    account_name = clean_text(message.text)
 
-    if account_name in allowed_users.get(user_name, []):
+    if account_name in allowed_users.get(user_name, []) or user_name == OWNER_USERNAME:
         user_accounts[user_name] = account_name
         markup = types.ReplyKeyboardMarkup(row_width=1)
         btn1 = types.KeyboardButton('طلب رابط تحديث السكن')
         btn2 = types.KeyboardButton('طلب رمز السكن')
         btn3 = types.KeyboardButton('طلب استعادة كلمة المرور')
         markup.add(btn1, btn2, btn3)
+
+        if user_name == OWNER_USERNAME:
+            btn4 = types.KeyboardButton('طلب رمز تسجيل الدخول')
+            btn5 = types.KeyboardButton('طلب رابط عضويتك معلقة')
+            markup.add(btn4, btn5)
+
         bot.send_message(message.chat.id, "اختر العملية المطلوبة:", reply_markup=markup)
     else:
         bot.send_message(message.chat.id, "اسم الحساب غير موجود ضمن الحسابات المصرح بها. حاول مرة أخرى:")
         bot.register_next_step_handler(message, process_account_name)
 
-# التعامل مع خيارات الأزرار
-@bot.message_handler(func=lambda message: message.text in ['طلب رابط تحديث السكن', 'طلب رمز السكن', 'طلب استعادة كلمة المرور'])
+# التعامل مع الطلبات
+@bot.message_handler(func=lambda message: message.text in [
+    'طلب رابط تحديث السكن', 'طلب رمز السكن', 'طلب استعادة كلمة المرور',
+    'طلب رمز تسجيل الدخول', 'طلب رابط عضويتك معلقة'
+])
 def handle_requests(message):
-    user_name = message.from_user.username
+    user_name = clean_text(message.from_user.username)
+    user_email = user_accounts.get(user_name)
 
-    if user_name not in user_accounts:
-        bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب أولاً باستخدام /start.")
+    if not user_email:
+        bot.send_message(message.chat.id, "لم يتم تسجيل حساب. يرجى إعادة إدخال اسم الحساب.")
         return
 
-    bot.send_message(message.chat.id, "جارٍ معالجة طلبك، يرجى الانتظار...")
-
     if message.text == 'طلب رابط تحديث السكن':
-        emails = fetch_emails(["مهم: كيفية تحديث السكن"])
+        response = fetch_emails(["مهم: كيفية تحديث السكن"], [r"نعم، أنا قدمت الطلب.*?(https?://\S+)"], user_email)
     elif message.text == 'طلب رمز السكن':
-        emails = fetch_emails(["Your Netflix temporary access code"])
+        response = fetch_emails(["رمز الوصول المؤقت من Netflix"], [r"الحصول على الرمز.*?(\d{6})"], user_email)
     elif message.text == 'طلب استعادة كلمة المرور':
-        emails = fetch_emails(["استكمل طلب إعادة تعيين كلمة المرور الخاصة بك"])
-
-    if not emails:
-        bot.send_message(message.chat.id, "لم يتم العثور على رسائل مطابقة.")
+        response = fetch_emails(["استكمل طلب إعادة تعيين كلمة المرور"], [r"إعادة تعيين كلمة المرور.*?(https?://\S+)"], user_email)
+    elif message.text == 'طلب رمز تسجيل الدخول' and user_name == OWNER_USERNAME:
+        response = fetch_emails(["Netflix: رمز تسجيل الدخول"], [r"إدخال الرمز التالي لتسجيل الدخول.*?(\d{6})"], user_email)
+    elif message.text == 'طلب رابط عضويتك معلقة' and user_name == OWNER_USERNAME:
+        response = fetch_emails(["عضويتك في Netflix معلّقة"], [r"إضافة معلومات الدفع.*?(https?://\S+)"], user_email)
     else:
-        for email_content in emails:
-            bot.send_message(message.chat.id, email_content)
+        response = ["ليس لديك صلاحية لتنفيذ هذا الطلب."]
+
+    if response:
+        bot.send_message(message.chat.id, "\n".join(response))
+    else:
+        bot.send_message(message.chat.id, "لم يتم العثور على الرسالة المطلوبة.")
 
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
