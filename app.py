@@ -37,17 +37,16 @@ def clean_text(text):
     return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
 
 # دالة لجلب الرسائل من البريد الإلكتروني
-def fetch_emails(search_keywords):
+def fetch_emails(account, search_keywords):
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
         mail.login(EMAIL, PASSWORD)
         mail.select("inbox")
 
-        result, data = mail.search(None, "ALL")
+        result, data = mail.search(None, 'ALL')
         mail_ids = data[0].split()
 
-        messages = []
-        for mail_id in mail_ids[-20:]:
+        for mail_id in reversed(mail_ids[-20:]):
             result, msg_data = mail.fetch(mail_id, "(RFC822)")
             raw_email = msg_data[0][1]
             msg = email.message_from_bytes(raw_email)
@@ -57,17 +56,18 @@ def fetch_emails(search_keywords):
                 subject = subject.decode(encoding if encoding else "utf-8")
 
             if any(keyword in subject for keyword in search_keywords):
-                payload = msg.get_payload(decode=True)
-                if payload:
-                    soup = BeautifulSoup(payload, "html.parser")
-                    text = soup.get_text()
-                    messages.append(text)
+                for part in msg.walk():
+                    if part.get_content_type() == "text/html":
+                        html_content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                        soup = BeautifulSoup(html_content, 'html.parser')
+                        text = soup.get_text()
+                        if account in text:
+                            return text
 
-        mail.logout()
-        return messages
+        return "لم يتم العثور على رسائل مطابقة لهذا الحساب."
 
     except Exception as e:
-        return [f"Error fetching emails: {e}"]
+        return f"Error fetching emails: {e}"
 
 # بدء البوت
 @bot.message_handler(commands=['start'])
@@ -107,18 +107,13 @@ def handle_requests(message):
         return
 
     if message.text == 'طلب رابط تحديث السكن':
-        emails = fetch_emails(["تحديث السكن"])
+        response = fetch_emails(account, ["تحديث السكن"])
     elif message.text == 'طلب رمز السكن':
-        emails = fetch_emails(["رمز الوصول المؤقت"])
+        response = fetch_emails(account, ["رمز الوصول المؤقت"])
     elif message.text == 'طلب استعادة كلمة المرور':
-        emails = fetch_emails(["إعادة تعيين كلمة المرور"])
+        response = fetch_emails(account, ["إعادة تعيين كلمة المرور"])
 
-    for email_content in emails:
-        if account in email_content:
-            bot.send_message(message.chat.id, email_content)
-            return
-
-    bot.send_message(message.chat.id, "لم يتم العثور على رسائل مطابقة لهذا الحساب.")
+    bot.send_message(message.chat.id, response)
 
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
