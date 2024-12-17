@@ -18,7 +18,7 @@ EMAIL = "azal12345zz@gmail.com"
 PASSWORD = "pbnr pihp anhm vlxp"
 IMAP_SERVER = "imap.gmail.com"
 
-# المستخدمون المصرح بهم وحساباتهم
+# المستخدمون المصرح بهم مع حساباتهم
 allowed_users = {
     "Ray2ak": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me"],
     "Lamak_8": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me"],
@@ -26,14 +26,9 @@ allowed_users = {
     "ZahraaKhabbaz": ["e2@flix1.me"]
 }
 
-# حساب مالك البوت الأساسي
-OWNER_USERNAME = "Ray2ak"
+user_accounts = {}
 
-# تنظيف النص من الأحرف غير المرئية
-def clean_text(text):
-    return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
-
-# دالة لجلب الرسائل من البريد الإلكتروني
+# دالة لسحب رسائل البريد الإلكتروني
 def fetch_emails(search_keywords):
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
@@ -41,11 +36,19 @@ def fetch_emails(search_keywords):
         mail.select("inbox")
 
         result, data = mail.search(None, "ALL")
+        if result != 'OK':
+            return ["فشل في البحث عن الرسائل."]
+
         mail_ids = data[0].split()
+        if not mail_ids:
+            return ["لا توجد رسائل في البريد الوارد."]
 
         messages = []
         for mail_id in mail_ids[-20:]:
             result, msg_data = mail.fetch(mail_id, "(RFC822)")
+            if result != 'OK':
+                continue
+
             raw_email = msg_data[0][1]
             msg = email.message_from_bytes(raw_email)
 
@@ -70,18 +73,19 @@ def fetch_emails(search_keywords):
 # بدء البوت
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    telegram_username = clean_text(message.from_user.username)
-    if telegram_username in allowed_users or telegram_username == OWNER_USERNAME:
+    telegram_username = message.from_user.username
+
+    if telegram_username in allowed_users:
         bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
         bot.register_next_step_handler(message, process_account_name)
     else:
         bot.send_message(message.chat.id, "غير مصرح لك باستخدام هذا البوت.")
 
 def process_account_name(message):
-    user_name = clean_text(message.from_user.username)
-    account_name = clean_text(message.text)
+    user_name = message.from_user.username
+    account_name = message.text
 
-    if user_name == OWNER_USERNAME or account_name in allowed_users.get(user_name, []):
+    if account_name in allowed_users.get(user_name, []):
         user_accounts[user_name] = account_name
         markup = types.ReplyKeyboardMarkup(row_width=1)
         btn1 = types.KeyboardButton('طلب رابط تحديث السكن')
@@ -93,13 +97,16 @@ def process_account_name(message):
         bot.send_message(message.chat.id, "اسم الحساب غير موجود ضمن الحسابات المصرح بها. حاول مرة أخرى:")
         bot.register_next_step_handler(message, process_account_name)
 
-# التعامل مع الطلبات
+# التعامل مع خيارات الأزرار
 @bot.message_handler(func=lambda message: message.text in ['طلب رابط تحديث السكن', 'طلب رمز السكن', 'طلب استعادة كلمة المرور'])
 def handle_requests(message):
-    user_name = clean_text(message.from_user.username)
+    user_name = message.from_user.username
+
     if user_name not in user_accounts:
         bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب أولاً باستخدام /start.")
         return
+
+    bot.send_message(message.chat.id, "جارٍ معالجة طلبك، يرجى الانتظار...")
 
     if message.text == 'طلب رابط تحديث السكن':
         emails = fetch_emails(["مهم: كيفية تحديث السكن"])
@@ -108,8 +115,11 @@ def handle_requests(message):
     elif message.text == 'طلب استعادة كلمة المرور':
         emails = fetch_emails(["استكمل طلب إعادة تعيين كلمة المرور الخاصة بك"])
 
-    for email_content in emails:
-        bot.send_message(message.chat.id, email_content)
+    if not emails:
+        bot.send_message(message.chat.id, "لم يتم العثور على رسائل مطابقة.")
+    else:
+        for email_content in emails:
+            bot.send_message(message.chat.id, email_content)
 
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
