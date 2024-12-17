@@ -36,7 +36,6 @@ user_accounts = {}
 def clean_text(text):
     return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
 
-# دالة لجلب الرسائل من البريد الإلكتروني
 def fetch_emails(account, search_keywords):
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
@@ -60,11 +59,18 @@ def fetch_emails(account, search_keywords):
                     if part.get_content_type() == "text/html":
                         html_content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
                         soup = BeautifulSoup(html_content, 'html.parser')
-                        text = soup.get_text()
-                        if account in text:
-                            return text
+                        
+                        # استخراج الروابط من الأزرار
+                        button_link = None
+                        for a in soup.find_all('a', href=True):
+                            if 'إعادة تعيين كلمة المرور' in a.get_text() or 'الحصول على الرمز' in a.get_text() or 'نعم، أنا قدمت الطلب' in a.get_text():
+                                button_link = a['href']
+                                break
 
-        return "لم يتم العثور على رسائل مطابقة لهذا الحساب."
+                        if button_link:
+                            return button_link
+
+        return "لم يتم العثور على روابط مطابقة لهذا الحساب."
 
     except Exception as e:
         return f"Error fetching emails: {e}"
