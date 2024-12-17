@@ -1,4 +1,3 @@
-
 import telebot
 import requests
 from telebot import types
@@ -6,11 +5,11 @@ from flask import Flask, request
 import imaplib
 import email
 from email.header import decode_header
-import datetime
 
 # توكن البوت
 TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
 bot = telebot.TeleBot(TOKEN)
+
 # Flask app
 app = Flask(__name__)
 
@@ -22,10 +21,10 @@ IMAP_SERVER = "imap.gmail.com"
 # حساب مالك البوت الأساسي
 OWNER_USERNAME = "owner_username"
 
-# روابط البيانات
-URL_TELEGRAM_USERS = "https://github.com/Zahraa-sy/test/blob/main/allowed_names.json"
+# روابط البيانات (ملف JSON مباشر)
+URL_TELEGRAM_USERS = "https://raw.githubusercontent.com/Zahraa-sy/test/main/allowed_names.json"
 
-# تحميل بيانات مستخدمي تيليجرام
+# تحميل بيانات المستخدمين المسموح بهم
 def load_json_data(url):
     try:
         response = requests.get(url)
@@ -35,9 +34,10 @@ def load_json_data(url):
         print(f"Error loading data from {url}: {e}")
         return {}
 
-telegram_users = load_json_data(URL_TELEGRAM_USERS).get("telegram_users", [])
+data = load_json_data(URL_TELEGRAM_USERS)
+allowed_users = {user['username'].strip(): user['accounts'] for user in data.get("allowed_names", []) if user['username'].strip()}
 
-# وظيفة لسحب رسائل البريد الإلكتروني
+# وظيفة لجلب رسائل البريد
 def fetch_emails(search_subjects):
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
@@ -71,10 +71,11 @@ def fetch_emails(search_subjects):
 # بدء البوت
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    telegram_username = message.from_user.username
+    telegram_username = message.from_user.username.strip()
+
     if telegram_username == OWNER_USERNAME:
         bot.send_message(message.chat.id, "أهلاً بك مالك البوت! سيتم إرسال الرسائل المهمة إليك.")
-    elif telegram_username in telegram_users:
+    elif telegram_username in allowed_users:
         markup = types.ReplyKeyboardMarkup(row_width=1)
         btn1 = types.KeyboardButton('طلب رابط تحديث السكن')
         btn2 = types.KeyboardButton('طلب رمز السكن')
@@ -82,11 +83,16 @@ def start_message(message):
         markup.add(btn1, btn2, btn3)
         bot.send_message(message.chat.id, "اختر العملية المطلوبة:", reply_markup=markup)
     else:
-        bot.send_message(message.chat.id, "غير مصرح لك باستخدام هذا البوت.")
+        bot.send_message(message.chat.id, f"غير مصرح لك باستخدام هذا البوت.\nاسم المستخدم: {telegram_username}")
 
 @bot.message_handler(content_types=['text'])
 def handle_text(message):
-    telegram_username = message.from_user.username
+    telegram_username = message.from_user.username.strip()
+
+    if telegram_username not in allowed_users:
+        bot.send_message(message.chat.id, "عذرًا، ليس لديك إذن لاستخدام هذا البوت.")
+        return
+
     if message.text == 'طلب رابط تحديث السكن':
         emails = fetch_emails(["تحديث السكن"])
         for email_content in emails:
@@ -113,4 +119,3 @@ def webhook():
 # تشغيل Flask
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-
