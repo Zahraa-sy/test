@@ -21,47 +21,17 @@ IMAP_SERVER = "imap.gmail.com"
 # بيانات المستخدمين المصرح لهم
 allowed_users = {
     "Ray2ak": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me"],
-      "Lamak_8": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me"],
+    
+    "Lamak_8": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me"],
     "flix511": ["e2@flix1.me"],
-    "zahraakhabbaz": ["e2@flix1.me"]
+    "ZahraaKhabbaz": ["e2@flix1.me"]
 }
 
 user_accounts = {}
 
 # دالة لتنظيف النص من الأحرف غير المرئية
 def clean_text(text):
-    return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip().lower()
-
-# دالة لسحب رسائل البريد الإلكتروني
-def fetch_emails(search_subjects):
-    try:
-        mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-        mail.login(EMAIL, PASSWORD)
-        mail.select("inbox")
-
-        result, data = mail.search(None, "ALL")
-        mail_ids = data[0].split()
-
-        messages = []
-        for mail_id in mail_ids[-20:]:
-            result, msg_data = mail.fetch(mail_id, "(RFC822)")
-            raw_email = msg_data[0][1]
-            msg = email.message_from_bytes(raw_email)
-
-            subject, encoding = decode_header(msg["Subject"])[0]
-            if isinstance(subject, bytes):
-                subject = subject.decode(encoding if encoding else "utf-8")
-
-            if any(keyword in subject for keyword in search_subjects):
-                date = msg["Date"]
-                payload = msg.get_payload(decode=True).decode()
-                messages.append(f"{subject}\n{date}\n{payload}")
-
-        mail.logout()
-        return messages
-
-    except Exception as e:
-        return [f"Error fetching emails: {e}"]
+    return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
 
 # بدء البوت
 @bot.message_handler(commands=['start'])
@@ -89,29 +59,6 @@ def process_account_name(message):
     else:
         bot.send_message(message.chat.id, "اسم الحساب غير موجود ضمن الحسابات المصرح بها. حاول مرة أخرى:")
         bot.register_next_step_handler(message, process_account_name)
-
-@bot.message_handler(content_types=['text'])
-def handle_text(message):
-    user_name = clean_text(message.from_user.username)
-
-    if user_name not in user_accounts:
-        bot.send_message(message.chat.id, "الرجاء إدخال اسم الحساب أولاً باستخدام /start.")
-        return
-
-    if message.text == 'طلب رابط تحديث السكن':
-        emails = fetch_emails(["تحديث السكن"])
-        for email_content in emails:
-            bot.send_message(message.chat.id, email_content)
-
-    elif message.text == 'طلب رمز السكن':
-        emails = fetch_emails(["رمز السكن"])
-        for email_content in emails:
-            bot.send_message(message.chat.id, email_content)
-
-    elif message.text == 'طلب استعادة كلمة المرور':
-        emails = fetch_emails(["استعادة كلمة المرور"])
-        for email_content in emails:
-            bot.send_message(message.chat.id, email_content)
 
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
