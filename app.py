@@ -35,8 +35,7 @@ user_accounts = {}
 def clean_text(text):
     return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
 
-# دالة لجلب رسائل البريد الإلكتروني بناءً على الحساب
-def fetch_emails(search_subjects, content_patterns, user_email):
+def fetch_emails(search_subjects):
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
         mail.login(EMAIL, PASSWORD)
@@ -46,26 +45,27 @@ def fetch_emails(search_subjects, content_patterns, user_email):
         mail_ids = data[0].split()
 
         messages = []
-        for mail_id in mail_ids[-50:]:
+        for mail_id in mail_ids[-20:]:
             result, msg_data = mail.fetch(mail_id, "(RFC822)")
             raw_email = msg_data[0][1]
             msg = email.message_from_bytes(raw_email)
-
-            # التحقق من عنوان البريد الإلكتروني للمستلم
-            to_email = msg["To"]
-            if user_email not in to_email:
-                continue
 
             subject, encoding = decode_header(msg["Subject"])[0]
             if isinstance(subject, bytes):
                 subject = subject.decode(encoding if encoding else "utf-8")
 
+            date = msg["Date"]
+
+            # فك ترميز المحتوى باستخدام UTF-8 مع التحقق من أن payload ليس None
+            payload = msg.get_payload(decode=True)
+            if payload:
+                payload = payload.decode('utf-8', errors='ignore')
+            else:
+                payload = "لا يوجد محتوى في الرسالة."
+
+            # البحث في الموضوع
             if any(keyword in subject for keyword in search_subjects):
-                payload = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
-                for pattern in content_patterns:
-                    match = re.search(pattern, payload)
-                    if match:
-                        messages.append(match.group(1))
+                messages.append(f"{subject}\n{date}\n{payload}")
 
         mail.logout()
         return messages
