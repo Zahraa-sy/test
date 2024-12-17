@@ -20,7 +20,7 @@ PASSWORD = "pbnr pihp anhm vlxp"
 IMAP_SERVER = "imap.gmail.com"
 
 # قائمة المالكين (Admins)
-admin_users = ["Ray2ak", "flix511"و"Lamak_8"]
+admin_users = ["Ray2ak", "flix511","Lamak_8"]
 
 # المستخدمون المصرح لهم وحساباتهم
 allowed_users = {
