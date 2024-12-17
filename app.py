@@ -37,6 +37,9 @@ def load_json_data(url):
 data = load_json_data(URL_TELEGRAM_USERS)
 allowed_users = {user['username'].strip(): user['accounts'] for user in data.get("allowed_names", []) if user['username'].strip()}
 
+# قائمة مؤقتة لتخزين الحساب المدخل لكل مستخدم
+user_accounts = {}
+
 # وظيفة لجلب رسائل البريد
 def fetch_emails(search_subjects):
     try:
@@ -73,9 +76,18 @@ def fetch_emails(search_subjects):
 def start_message(message):
     telegram_username = message.from_user.username.strip()
 
-    if telegram_username == OWNER_USERNAME:
-        bot.send_message(message.chat.id, "أهلاً بك مالك البوت! سيتم إرسال الرسائل المهمة إليك.")
-    elif telegram_username in allowed_users:
+    if telegram_username in allowed_users:
+        bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
+        bot.register_next_step_handler(message, process_account_name)
+    else:
+        bot.send_message(message.chat.id, f"غير مصرح لك باستخدام هذا البوت.\nاسم المستخدم: {telegram_username}")
+
+def process_account_name(message):
+    user_name = message.from_user.username.strip()
+    account_name = message.text.strip()
+    
+    if account_name in allowed_users[user_name]:
+        user_accounts[user_name] = account_name
         markup = types.ReplyKeyboardMarkup(row_width=1)
         btn1 = types.KeyboardButton('طلب رابط تحديث السكن')
         btn2 = types.KeyboardButton('طلب رمز السكن')
@@ -83,14 +95,16 @@ def start_message(message):
         markup.add(btn1, btn2, btn3)
         bot.send_message(message.chat.id, "اختر العملية المطلوبة:", reply_markup=markup)
     else:
-        bot.send_message(message.chat.id, f"غير مصرح لك باستخدام هذا البوت.\nاسم المستخدم: {telegram_username}")
+        bot.send_message(message.chat.id, "اسم الحساب غير موجود ضمن الحسابات المصرح بها. حاول مرة أخرى:")
+        bot.register_next_step_handler(message, process_account_name)
 
 @bot.message_handler(content_types=['text'])
 def handle_text(message):
-    telegram_username = message.from_user.username.strip()
+    user_name = message.from_user.username.strip()
+    account_name = user_accounts.get(user_name)
 
-    if telegram_username not in allowed_users:
-        bot.send_message(message.chat.id, "عذرًا، ليس لديك إذن لاستخدام هذا البوت.")
+    if not account_name:
+        bot.send_message(message.chat.id, "يجب إدخال اسم الحساب أولاً. ابدأ بإرسال /start.")
         return
 
     if message.text == 'طلب رابط تحديث السكن':
