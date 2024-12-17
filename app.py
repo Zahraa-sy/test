@@ -5,6 +5,7 @@ from flask import Flask, request
 import imaplib
 import email
 from email.header import decode_header
+import re  # لإزالة الأحرف الغريبة
 
 # توكن البوت
 TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
@@ -18,75 +19,48 @@ EMAIL = "azal12345zz@gmail.com"
 PASSWORD = "pbnr pihp anhm vlxp"
 IMAP_SERVER = "imap.gmail.com"
 
-# حساب مالك البوت الأساسي
-OWNER_USERNAME = "owner_username"
+# رابط JSON الخاص بالمستخدمين المصرح بهم
+URL_ALLOWED_USERS = "https://raw.githubusercontent.com/Zahraa-sy/test/main/allowed_names.json"
 
-# روابط البيانات
-URL_TELEGRAM_USERS = "https://raw.githubusercontent.com/Zahraa-sy/test/main/allowed_names.json"
+# دالة لتنظيف النص من الأحرف غير المرئية
+def clean_text(text):
+    return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
 
-# تحميل بيانات المستخدمين المسموح بهم
+# تحميل البيانات مع تنظيفها
 def load_json_data(url):
     try:
         response = requests.get(url)
         response.raise_for_status()
-        return response.json()
+        raw_data = response.json()
+        cleaned_data = {
+            clean_text(user['username']).lower(): [clean_text(account).lower() for account in user['accounts']]
+            for user in raw_data.get("allowed_names", [])
+        }
+        return cleaned_data
     except Exception as e:
         print(f"Error loading data from {url}: {e}")
         return {}
 
-data = load_json_data(URL_TELEGRAM_USERS)
-allowed_users = {user['username'].strip(): [account.strip().lower() for account in user['accounts']] for user in data.get("allowed_names", [])}
-
-# قائمة مؤقتة لتخزين الحساب المدخل لكل مستخدم
+# تحميل بيانات المستخدمين
+allowed_users = load_json_data(URL_ALLOWED_USERS)
 user_accounts = {}
-
-# وظيفة لجلب رسائل البريد
-def fetch_emails(search_subjects):
-    try:
-        mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-        mail.login(EMAIL, PASSWORD)
-        mail.select("inbox")
-
-        result, data = mail.search(None, "ALL")
-        mail_ids = data[0].split()
-
-        messages = []
-        for mail_id in mail_ids[-20:]:
-            result, msg_data = mail.fetch(mail_id, "(RFC822)")
-            raw_email = msg_data[0][1]
-            msg = email.message_from_bytes(raw_email)
-
-            subject, encoding = decode_header(msg["Subject"])[0]
-            if isinstance(subject, bytes):
-                subject = subject.decode(encoding if encoding else "utf-8")
-
-            if any(keyword in subject for keyword in search_subjects):
-                date = msg["Date"]
-                payload = msg.get_payload(decode=True).decode()
-                messages.append(f"{subject}\n{date}\n{payload}")
-
-        mail.logout()
-        return messages
-
-    except Exception as e:
-        return [f"Error fetching emails: {e}"]
 
 # بدء البوت
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    telegram_username = message.from_user.username.strip()
+    telegram_username = clean_text(message.from_user.username).lower()
 
     if telegram_username in allowed_users:
         bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
         bot.register_next_step_handler(message, process_account_name)
     else:
-        bot.send_message(message.chat.id, f"غير مصرح لك باستخدام هذا البوت.\nاسم المستخدم: {telegram_username}")
+        bot.send_message(message.chat.id, "غير مصرح لك باستخدام هذا البوت.")
 
 def process_account_name(message):
-    user_name = message.from_user.username.strip()
-    account_name = message.text.strip().lower()  # تحويل إلى أحرف صغيرة
+    user_name = clean_text(message.from_user.username).lower()
+    account_name = clean_text(message.text).lower()
 
-    if account_name in allowed_users[user_name]:
+    if account_name in allowed_users.get(user_name, []):
         user_accounts[user_name] = account_name
         markup = types.ReplyKeyboardMarkup(row_width=1)
         btn1 = types.KeyboardButton('طلب رابط تحديث السكن')
@@ -98,31 +72,7 @@ def process_account_name(message):
         bot.send_message(message.chat.id, "اسم الحساب غير موجود ضمن الحسابات المصرح بها. حاول مرة أخرى:")
         bot.register_next_step_handler(message, process_account_name)
 
-@bot.message_handler(content_types=['text'])
-def handle_text(message):
-    user_name = message.from_user.username.strip()
-    account_name = user_accounts.get(user_name)
-
-    if not account_name:
-        bot.send_message(message.chat.id, "يجب إدخال اسم الحساب أولاً. ابدأ بإرسال /start.")
-        return
-
-    if message.text == 'طلب رابط تحديث السكن':
-        emails = fetch_emails(["تحديث السكن"])
-        for email_content in emails:
-            bot.send_message(message.chat.id, email_content)
-
-    elif message.text == 'طلب رمز السكن':
-        emails = fetch_emails(["رمز السكن"])
-        for email_content in emails:
-            bot.send_message(message.chat.id, email_content)
-
-    elif message.text == 'طلب استعادة كلمة المرور':
-        emails = fetch_emails(["استعادة كلمة المرور"])
-        for email_content in emails:
-            bot.send_message(message.chat.id, email_content)
-
-# إعداد مسار Webhook
+# إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
 def webhook():
     json_string = request.get_data().decode('utf-8')
@@ -130,6 +80,5 @@ def webhook():
     bot.process_new_updates([update])
     return '', 200
 
-# تشغيل Flask
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
