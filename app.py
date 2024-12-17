@@ -97,14 +97,28 @@ def process_account_name(message):
         btn1 = types.KeyboardButton('طلب رابط تحديث السكن')
         btn2 = types.KeyboardButton('طلب رمز السكن')
         btn3 = types.KeyboardButton('طلب استعادة كلمة المرور')
-        markup.add(btn1, btn2, btn3)
+
+        # إضافة خيارات إضافية للمالكين فقط
+        if user_name in OWNER_USERNAMES:
+            btn4 = types.KeyboardButton('طلب رمز تسجيل الدخول')
+            btn5 = types.KeyboardButton('طلب رابط العضوية المعلقة')
+            markup.add(btn1, btn2, btn3, btn4, btn5)
+        else:
+            markup.add(btn1, btn2, btn3)
+
         bot.send_message(message.chat.id, "اختر العملية المطلوبة:", reply_markup=markup)
     else:
         bot.send_message(message.chat.id, "اسم الحساب غير موجود ضمن الحسابات المصرح بها. حاول مرة أخرى:")
         bot.register_next_step_handler(message, process_account_name)
 
 # التعامل مع خيارات الأزرار
-@bot.message_handler(func=lambda message: message.text in ['طلب رابط تحديث السكن', 'طلب رمز السكن', 'طلب استعادة كلمة المرور'])
+@bot.message_handler(func=lambda message: message.text in [
+    'طلب رابط تحديث السكن', 
+    'طلب رمز السكن', 
+    'طلب استعادة كلمة المرور',
+    'طلب رمز تسجيل الدخول',
+    'طلب رابط العضوية المعلقة'
+])
 def handle_requests(message):
     user_name = clean_text(message.from_user.username)
     account = user_accounts.get(user_name)
@@ -119,6 +133,10 @@ def handle_requests(message):
         response = fetch_emails(account, ["رمز الوصول المؤقت"])
     elif message.text == 'طلب استعادة كلمة المرور':
         response = fetch_emails(account, ["إعادة تعيين كلمة المرور"])
+    elif message.text == 'طلب رمز تسجيل الدخول':
+        response = fetch_emails(account, ["رمز تسجيل الدخول"])
+    elif message.text == 'طلب رابط العضوية المعلقة':
+        response = fetch_emails(account, ["عضويتك معلقة"])
 
     bot.send_message(message.chat.id, response)
 
