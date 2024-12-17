@@ -18,7 +18,6 @@ EMAIL = "azal12345zz@gmail.com"
 PASSWORD = "pbnr pihp anhm vlxp"
 IMAP_SERVER = "imap.gmail.com"
 
-# بيانات المستخدمين المصرح لهم
 allowed_users = {
     "Ray2ak": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me"],
     
@@ -32,6 +31,37 @@ user_accounts = {}
 # دالة لتنظيف النص من الأحرف غير المرئية
 def clean_text(text):
     return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
+
+# دالة لجلب الرسائل من البريد الإلكتروني
+def fetch_emails(search_subject):
+    try:
+        mail = imaplib.IMAP4_SSL(IMAP_SERVER)
+        mail.login(EMAIL, PASSWORD)
+        mail.select("inbox")
+
+        result, data = mail.search(None, '(SUBJECT "{}")'.format(search_subject))
+        mail_ids = data[0].split()
+
+        if not mail_ids:
+            return "لم يتم العثور على رسائل بالموضوع المطلوب."
+
+        latest_email_id = mail_ids[-1]
+        result, msg_data = mail.fetch(latest_email_id, "(RFC822)")
+        raw_email = msg_data[0][1]
+        msg = email.message_from_bytes(raw_email)
+
+        subject, encoding = decode_header(msg["Subject"])[0]
+        if isinstance(subject, bytes):
+            subject = subject.decode(encoding if encoding else "utf-8")
+
+        payload = msg.get_payload(decode=True).decode()
+        date = msg["Date"]
+
+        mail.logout()
+        return f"الموضوع: {subject}\nالتاريخ: {date}\nالمحتوى:\n{payload}"
+
+    except Exception as e:
+        return f"حدث خطأ أثناء جلب الرسائل: {e}"
 
 # بدء البوت
 @bot.message_handler(commands=['start'])
@@ -59,6 +89,18 @@ def process_account_name(message):
     else:
         bot.send_message(message.chat.id, "اسم الحساب غير موجود ضمن الحسابات المصرح بها. حاول مرة أخرى:")
         bot.register_next_step_handler(message, process_account_name)
+
+# التعامل مع خيارات الأزرار
+@bot.message_handler(func=lambda message: message.text in ['طلب رابط تحديث السكن', 'طلب رمز السكن', 'طلب استعادة كلمة المرور'])
+def handle_requests(message):
+    if message.text == 'طلب رابط تحديث السكن':
+        response = fetch_emails("تحديث السكن")
+    elif message.text == 'طلب رمز السكن':
+        response = fetch_emails("رمز السكن")
+    elif message.text == 'طلب استعادة كلمة المرور':
+        response = fetch_emails("استعادة كلمة المرور")
+
+    bot.send_message(message.chat.id, response)
 
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
