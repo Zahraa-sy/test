@@ -20,7 +20,7 @@ PASSWORD = "pbnr pihp anhm vlxp"
 IMAP_SERVER = "imap.gmail.com"
 
 # قائمة المالكين (Admins)
-admin_users = ["Ray2ak", "flix511","Lamak_8"]
+admin_users = ["Ray2ak", "flix511", "Lamak_8"]
 
 # المستخدمون المصرح لهم وحساباتهم
 allowed_users = {
@@ -32,12 +32,12 @@ allowed_users = {
 
 user_accounts = {}
 
-# دالة لتنظيف النص
+# دالة لتنظيف النص من الأحرف غير المرئية
 def clean_text(text):
     return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
 
-# دالة للاتصال بالبريد الإلكتروني واستخراج الرابط أو الرمز
-def fetch_emails(account, subject_keywords, extract_type):
+# دالة عامة للاتصال بالبريد الإلكتروني
+def fetch_email(account, subject_keywords, extract_function):
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
         mail.login(EMAIL, PASSWORD)
@@ -60,19 +60,47 @@ def fetch_emails(account, subject_keywords, extract_type):
                     if part.get_content_type() == "text/html":
                         html_content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
                         soup = BeautifulSoup(html_content, 'html.parser')
-
-                        if extract_type == "link":
-                            for a in soup.find_all('a', href=True):
-                                return a['href']
-                        elif extract_type == "code":
-                            code_match = re.search(r'\b\d{4}\b', soup.get_text())
-                            if code_match:
-                                return code_match.group(0)
+                        return extract_function(soup)
 
         return "لم يتم العثور على الرسالة المطلوبة."
 
     except Exception as e:
         return f"Error fetching emails: {e}"
+
+# دالة لاستخراج رابط تحديث السكن
+def extract_update_address_link(soup):
+    for a in soup.find_all('a', href=True):
+        if 'نعم، أنا قدمت الطلب' in a.get_text():
+            return a['href']
+    return "لم يتم العثور على رابط تحديث السكن."
+
+# دالة لاستخراج رمز السكن
+def extract_temporary_code_link(soup):
+    for a in soup.find_all('a', href=True):
+        if 'الحصول على الرمز' in a.get_text():
+            return a['href']
+    return "لم يتم العثور على رابط رمز السكن."
+
+# دالة لاستخراج رابط استعادة كلمة المرور
+def extract_reset_password_link(soup):
+    for a in soup.find_all('a', href=True):
+        if 'إعادة تعيين كلمة المرور' in a.get_text():
+            return a['href']
+    return "لم يتم العثور على رابط استعادة كلمة المرور."
+
+# دالة لاستخراج رمز تسجيل الدخول
+def extract_login_code(soup):
+    code_match = re.search(r'\b\d{4}\b', soup.get_text())
+    if code_match:
+        return code_match.group(0)
+    return "لم يتم العثور على رمز تسجيل الدخول."
+
+# دالة لاستخراج رابط العضوية المعلقة
+def extract_suspended_membership_link(soup):
+    for a in soup.find_all('a', href=True):
+        if 'إضافة معلومات الدفع' in a.get_text():
+            return a['href']
+    return "لم يتم العثور على رابط العضوية المعلقة."
 
 # بدء البوت
 @bot.message_handler(commands=['start'])
@@ -92,14 +120,14 @@ def process_account_name(message):
     if account_name in allowed_users.get(user_name, []):
         user_accounts[user_name] = account_name
         markup = types.ReplyKeyboardMarkup(row_width=1)
-        
-        # الأزرار المشتركة للزبائن
+
+        # الأزرار المتاحة للزبائن
         btn1 = types.KeyboardButton('طلب رابط تحديث السكن')
         btn2 = types.KeyboardButton('طلب رمز السكن')
         btn3 = types.KeyboardButton('طلب استعادة كلمة المرور')
         markup.add(btn1, btn2, btn3)
 
-        # الأزرار الإضافية للمالكين
+        # إضافة أزرار خاصة للمالكين (Admins)
         if user_name in admin_users:
             btn4 = types.KeyboardButton('طلب رمز تسجيل الدخول')
             btn5 = types.KeyboardButton('طلب رابط العضوية المعلقة')
@@ -115,35 +143,35 @@ def process_account_name(message):
 def handle_update_address(message):
     user_name = clean_text(message.from_user.username)
     account = user_accounts.get(user_name)
-    response = fetch_emails(account, ["تحديث السكن"], "link")
+    response = fetch_email(account, ["تحديث السكن"], extract_update_address_link)
     bot.send_message(message.chat.id, response)
 
 @bot.message_handler(func=lambda message: message.text == 'طلب رمز السكن')
 def handle_temporary_code(message):
     user_name = clean_text(message.from_user.username)
     account = user_accounts.get(user_name)
-    response = fetch_emails(account, ["رمز الوصول المؤقت"], "link")
+    response = fetch_email(account, ["رمز الوصول المؤقت"], extract_temporary_code_link)
     bot.send_message(message.chat.id, response)
 
 @bot.message_handler(func=lambda message: message.text == 'طلب استعادة كلمة المرور')
 def handle_reset_password(message):
     user_name = clean_text(message.from_user.username)
     account = user_accounts.get(user_name)
-    response = fetch_emails(account, ["إعادة تعيين كلمة المرور"], "link")
+    response = fetch_email(account, ["إعادة تعيين كلمة المرور"], extract_reset_password_link)
     bot.send_message(message.chat.id, response)
 
 @bot.message_handler(func=lambda message: message.text == 'طلب رمز تسجيل الدخول')
 def handle_login_code(message):
     user_name = clean_text(message.from_user.username)
     account = user_accounts.get(user_name)
-    response = fetch_emails(account, ["إدخال الرمز التالي لتسجيل الدخول"], "code")
+    response = fetch_email(account, ["إدخال الرمز التالي لتسجيل الدخول"], extract_login_code)
     bot.send_message(message.chat.id, response)
 
 @bot.message_handler(func=lambda message: message.text == 'طلب رابط العضوية المعلقة')
 def handle_suspended_membership(message):
     user_name = clean_text(message.from_user.username)
     account = user_accounts.get(user_name)
-    response = fetch_emails(account, ["عضويتك في Netflix معلّقة"], "link")
+    response = fetch_email(account, ["عضويتك في Netflix معلّقة"], extract_suspended_membership_link)
     bot.send_message(message.chat.id, response)
 
 # إعداد Webhook
