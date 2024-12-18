@@ -32,11 +32,11 @@ allowed_users = {
 
 user_accounts = {}
 
-# دالة لتنظيف النص من الأحرف غير المرئية
+# دالة لتنظيف النص
 def clean_text(text):
     return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
 
-# دالة للاتصال بالبريد الإلكتروني وجلب الرسائل
+# دالة للاتصال بالبريد الإلكتروني واستخراج الرابط أو الرمز
 def fetch_emails(account, subject_keywords, extract_type):
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
@@ -61,16 +61,18 @@ def fetch_emails(account, subject_keywords, extract_type):
                         html_content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
                         soup = BeautifulSoup(html_content, 'html.parser')
 
-                        # استخراج الرابط من الأزرار فقط
-                        button = soup.select_one('a[href]')
-                        if button:
-                            return button['href']
+                        if extract_type == "link":
+                            for a in soup.find_all('a', href=True):
+                                return a['href']
+                        elif extract_type == "code":
+                            code_match = re.search(r'\b\d{4}\b', soup.get_text())
+                            if code_match:
+                                return code_match.group(0)
 
-        return "لم يتم العثور على الرابط المطلوب."
+        return "لم يتم العثور على الرسالة المطلوبة."
 
     except Exception as e:
         return f"Error fetching emails: {e}"
-
 
 # بدء البوت
 @bot.message_handler(commands=['start'])
@@ -90,14 +92,14 @@ def process_account_name(message):
     if account_name in allowed_users.get(user_name, []):
         user_accounts[user_name] = account_name
         markup = types.ReplyKeyboardMarkup(row_width=1)
-
-        # الأزرار المتاحة للزبائن
+        
+        # الأزرار المشتركة للزبائن
         btn1 = types.KeyboardButton('طلب رابط تحديث السكن')
         btn2 = types.KeyboardButton('طلب رمز السكن')
         btn3 = types.KeyboardButton('طلب استعادة كلمة المرور')
         markup.add(btn1, btn2, btn3)
 
-        # إضافة أزرار خاصة للمالكين (Admins)
+        # الأزرار الإضافية للمالكين
         if user_name in admin_users:
             btn4 = types.KeyboardButton('طلب رمز تسجيل الدخول')
             btn5 = types.KeyboardButton('طلب رابط العضوية المعلقة')
