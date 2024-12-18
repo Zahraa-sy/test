@@ -5,7 +5,6 @@ import imaplib
 import email
 from email.header import decode_header
 from bs4 import BeautifulSoup
-import re
 
 # توكن البوت
 TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
@@ -32,12 +31,34 @@ allowed_users = {
 
 user_accounts = {}
 
-# دالة لتنظيف النص من الأحرف غير المرئية
+# دالة لتنظيف النص
 def clean_text(text):
-    return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
+    return text.strip()
 
-# دالة للاتصال بالبريد الإلكتروني وجلب الرسائل
-def fetch_latest_email(account, subject_keywords, extract_function):
+# التوابع لاستخراج المعلومات بناءً على الحساب والطلب
+
+# 1. رابط تحديث السكن
+def fetch_update_address_link(account):
+    return fetch_email_with_link(account, ["تحديث السكن"], "نعم، أنا قدمت الطلب")
+
+# 2. رابط رمز السكن
+def fetch_temporary_code_link(account):
+    return fetch_email_with_link(account, ["رمز الوصول المؤقت"], "الحصول على الرمز")
+
+# 3. رابط استعادة كلمة المرور
+def fetch_reset_password_link(account):
+    return fetch_email_with_link(account, ["إعادة تعيين كلمة المرور"], "إعادة تعيين كلمة المرور")
+
+# 4. رمز تسجيل الدخول (أرقام من النص)
+def fetch_login_code(account):
+    return fetch_email_with_code(account, ["رمز تسجيل الدخول"])
+
+# 5. رابط العضوية المعلقة
+def fetch_suspended_membership_link(account):
+    return fetch_email_with_link(account, ["عضويتك في Netflix معلّقة"], "إضافة معلومات الدفع")
+
+# دالة مساعدة لجلب الرابط
+def fetch_email_with_link(account, subject_keywords, button_text):
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
         mail.login(EMAIL, PASSWORD)
@@ -59,46 +80,53 @@ def fetch_latest_email(account, subject_keywords, extract_function):
                 for part in msg.walk():
                     if part.get_content_type() == "text/html":
                         html_content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
-                        soup = BeautifulSoup(html_content, 'html.parser')
-                        result = extract_function(soup)
-                        if result:
-                            mail.logout()
-                            return result
+                        if account in html_content:
+                            soup = BeautifulSoup(html_content, 'html.parser')
+                            for a in soup.find_all('a', href=True):
+                                if button_text in a.get_text():
+                                    mail.logout()
+                                    return a['href']
 
         mail.logout()
-        return "لم يتم العثور على الرسالة المطلوبة."
+        return "لم يتم العثور على الرابط المطلوب."
 
     except Exception as e:
         return f"Error fetching emails: {e}"
 
-# دوال استخراج البيانات
-def extract_update_address_link(soup):
-    for a in soup.find_all('a', href=True):
-        if 'نعم، أنا قدمت الطلب' in a.get_text():
-            return a['href']
-    return "لم يتم العثور على رابط تحديث السكن."
+# دالة مساعدة لجلب رمز مكون من 4 أرقام
+def fetch_email_with_code(account, subject_keywords):
+    try:
+        mail = imaplib.IMAP4_SSL(IMAP_SERVER)
+        mail.login(EMAIL, PASSWORD)
+        mail.select("inbox")
 
-def extract_temporary_code_link(soup):
-    for a in soup.find_all('a', href=True):
-        if 'الحصول على الرمز' in a.get_text():
-            return a['href']
-    return "لم يتم العثور على رابط رمز السكن."
+        result, data = mail.search(None, 'ALL')
+        mail_ids = data[0].split()
 
-def extract_reset_password_link(soup):
-    for a in soup.find_all('a', href=True):
-        if 'إعادة تعيين كلمة المرور' in a.get_text():
-            return a['href']
-    return "لم يتم العثور على رابط استعادة كلمة المرور."
+        for mail_id in reversed(mail_ids):
+            result, msg_data = mail.fetch(mail_id, "(RFC822)")
+            raw_email = msg_data[0][1]
+            msg = email.message_from_bytes(raw_email)
 
-def extract_login_code(soup):
-    code_match = re.search(r'\b\d{4}\b', soup.get_text())
-    return code_match.group(0) if code_match else "لم يتم العثور على رمز تسجيل الدخول."
+            subject, encoding = decode_header(msg["Subject"])[0]
+            if isinstance(subject, bytes):
+                subject = subject.decode(encoding if encoding else "utf-8")
 
-def extract_suspended_membership_link(soup):
-    for a in soup.find_all('a', href=True):
-        if 'إضافة معلومات الدفع' in a.get_text():
-            return a['href']
-    return "لم يتم العثور على رابط العضوية المعلقة."
+            if any(keyword in subject for keyword in subject_keywords):
+                for part in msg.walk():
+                    if part.get_content_type() == "text/html":
+                        html_content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                        if account in html_content:
+                            code_match = re.search(r'\b\d{4}\b', BeautifulSoup(html_content, 'html.parser').get_text())
+                            if code_match:
+                                mail.logout()
+                                return code_match.group(0)
+
+        mail.logout()
+        return "لم يتم العثور على رمز تسجيل الدخول."
+
+    except Exception as e:
+        return f"Error fetching emails: {e}"
 
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
@@ -111,3 +139,8 @@ def webhook():
 # تشغيل Flask
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+
+
+
+
+
