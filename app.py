@@ -37,24 +37,18 @@ def clean_text(text):
     return text.strip()
 
 # التوابع لاستخراج المعلومات بناءً على الحساب والطلب
-
-# 1. رابط تحديث السكن
 def fetch_update_address_link(account):
     return fetch_email_with_link(account, ["تحديث السكن"], "نعم، أنا قدمت الطلب")
 
-# 2. رابط رمز السكن
 def fetch_temporary_code_link(account):
     return fetch_email_with_link(account, ["رمز الوصول المؤقت"], "الحصول على الرمز")
 
-# 3. رابط استعادة كلمة المرور
 def fetch_reset_password_link(account):
     return fetch_email_with_link(account, ["إعادة تعيين كلمة المرور"], "إعادة تعيين كلمة المرور")
 
-# 4. رمز تسجيل الدخول (أرقام من النص)
 def fetch_login_code(account):
     return fetch_email_with_code(account, ["رمز تسجيل الدخول"])
 
-# 5. رابط العضوية المعلقة
 def fetch_suspended_membership_link(account):
     return fetch_email_with_link(account, ["عضويتك في Netflix معلّقة"], "إضافة معلومات الدفع")
 
@@ -128,6 +122,64 @@ def fetch_email_with_code(account, subject_keywords):
 
     except Exception as e:
         return f"Error fetching emails: {e}"
+
+# بدء البوت
+@bot.message_handler(commands=['start'])
+def start_message(message):
+    telegram_username = clean_text(message.from_user.username)
+    if telegram_username in allowed_users or telegram_username in admin_users:
+        bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
+        bot.register_next_step_handler(message, process_account_name)
+    else:
+        bot.send_message(message.chat.id, "غير مصرح لك باستخدام هذا البوت.")
+
+def process_account_name(message):
+    user_name = clean_text(message.from_user.username)
+    account_name = clean_text(message.text)
+
+    if account_name in allowed_users.get(user_name, []) or user_name in admin_users:
+        user_accounts[user_name] = account_name
+        markup = types.ReplyKeyboardMarkup(row_width=1)
+        btn1 = types.KeyboardButton('طلب رابط تحديث السكن')
+        btn2 = types.KeyboardButton('طلب رمز السكن')
+        btn3 = types.KeyboardButton('طلب استعادة كلمة المرور')
+        if user_name in admin_users:
+            btn4 = types.KeyboardButton('طلب رمز تسجيل الدخول')
+            btn5 = types.KeyboardButton('طلب رابط عضويتك معلقة')
+            markup.add(btn4, btn5)
+        markup.add(btn1, btn2, btn3)
+        bot.send_message(message.chat.id, "اختر العملية المطلوبة:", reply_markup=markup)
+    else:
+        bot.send_message(message.chat.id, "اسم الحساب غير موجود ضمن الحسابات المصرح بها. حاول مرة أخرى:")
+        bot.register_next_step_handler(message, process_account_name)
+
+# التعامل مع الطلبات
+@bot.message_handler(func=lambda message: message.text in [
+    'طلب رابط تحديث السكن', 'طلب رمز السكن', 'طلب استعادة كلمة المرور',
+    'طلب رمز تسجيل الدخول', 'طلب رابط عضويتك معلقة'
+])
+def handle_requests(message):
+    user_name = clean_text(message.from_user.username)
+    account = user_accounts.get(user_name)
+
+    if not account:
+        bot.send_message(message.chat.id, "لم يتم تحديد حساب بعد. أعد تشغيل البوت وأدخل اسم الحساب.")
+        return
+
+    if message.text == 'طلب رابط تحديث السكن':
+        response = fetch_update_address_link(account)
+    elif message.text == 'طلب رمز السكن':
+        response = fetch_temporary_code_link(account)
+    elif message.text == 'طلب استعادة كلمة المرور':
+        response = fetch_reset_password_link(account)
+    elif message.text == 'طلب رمز تسجيل الدخول' and user_name in admin_users:
+        response = fetch_login_code(account)
+    elif message.text == 'طلب رابط عضويتك معلقة' and user_name in admin_users:
+        response = fetch_suspended_membership_link(account)
+    else:
+        response = "ليس لديك صلاحية لتنفيذ هذا الطلب."
+
+    bot.send_message(message.chat.id, response)
 
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
