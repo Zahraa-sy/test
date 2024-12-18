@@ -36,7 +36,7 @@ user_accounts = {}
 def clean_text(text):
     return re.sub(r"[\u200f\u202c\u202b\u200e]", "", text).strip()
 
-# دالة للاتصال بالبريد الإلكتروني وجلب أحدث رسالة تحتوي على الحساب المطلوب
+# دالة للاتصال بالبريد الإلكتروني وجلب الرسائل
 def fetch_latest_email(account, subject_keywords, extract_function):
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
@@ -60,19 +60,18 @@ def fetch_latest_email(account, subject_keywords, extract_function):
                     if part.get_content_type() == "text/html":
                         html_content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
                         soup = BeautifulSoup(html_content, 'html.parser')
-                        
-                        # التأكد من أن الرسالة تحتوي على الحساب المطلوب
-                        if account in html_content:
-                            result = extract_function(soup)
-                            if result:
-                                return result
+                        result = extract_function(soup)
+                        if result:
+                            mail.logout()
+                            return result
 
-        return "لم يتم العثور على الرسالة المطلوبة لهذا الحساب."
+        mail.logout()
+        return "لم يتم العثور على الرسالة المطلوبة."
 
     except Exception as e:
         return f"Error fetching emails: {e}"
 
-# دوال استخراج الروابط والرموز
+# دوال استخراج البيانات
 def extract_update_address_link(soup):
     for a in soup.find_all('a', href=True):
         if 'نعم، أنا قدمت الطلب' in a.get_text():
@@ -100,36 +99,6 @@ def extract_suspended_membership_link(soup):
         if 'إضافة معلومات الدفع' in a.get_text():
             return a['href']
     return "لم يتم العثور على رابط العضوية المعلقة."
-
-# بدء البوت
-@bot.message_handler(commands=['start'])
-def start_message(message):
-    telegram_username = clean_text(message.from_user.username)
-    if telegram_username in allowed_users:
-        bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
-        bot.register_next_step_handler(message, process_account_name)
-    else:
-        bot.send_message(message.chat.id, "غير مصرح لك باستخدام هذا البوت.")
-
-def process_account_name(message):
-    user_name = clean_text(message.from_user.username)
-    account_name = clean_text(message.text)
-
-    if account_name in allowed_users.get(user_name, []):
-        user_accounts[user_name] = account_name
-        markup = types.ReplyKeyboardMarkup(row_width=1)
-        btn1 = types.KeyboardButton('طلب رابط تحديث السكن')
-        btn2 = types.KeyboardButton('طلب رمز السكن')
-        btn3 = types.KeyboardButton('طلب استعادة كلمة المرور')
-        if user_name in admin_users:
-            btn4 = types.KeyboardButton('طلب رمز تسجيل الدخول')
-            btn5 = types.KeyboardButton('طلب رابط العضوية المعلقة')
-            markup.add(btn4, btn5)
-        markup.add(btn1, btn2, btn3)
-        bot.send_message(message.chat.id, "اختر العملية المطلوبة:", reply_markup=markup)
-    else:
-        bot.send_message(message.chat.id, "اسم الحساب غير موجود ضمن الحسابات المصرح بها. حاول مرة أخرى:")
-        bot.register_next_step_handler(message, process_account_name)
 
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
