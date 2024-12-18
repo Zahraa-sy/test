@@ -61,8 +61,8 @@ def fetch_emails(account, subject_keywords, extract_type):
                         html_content = part.get_payload(decode=True).decode('utf-8', errors='ignore')
                         soup = BeautifulSoup(html_content, 'html.parser')
 
-                        # استخراج الرابط من أول زر فقط
-                        button = soup.find('a', href=True)
+                        # استخراج الرابط من الأزرار فقط
+                        button = soup.select_one('a[href]')
                         if button:
                             return button['href']
 
@@ -70,7 +70,6 @@ def fetch_emails(account, subject_keywords, extract_type):
 
     except Exception as e:
         return f"Error fetching emails: {e}"
-
 
 
 # بدء البوت
