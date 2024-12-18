@@ -6,6 +6,7 @@ import email
 from email.header import decode_header
 from bs4 import BeautifulSoup
 import re
+import time
 
 # توكن البوت
 TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
@@ -31,10 +32,20 @@ allowed_users = {
 }
 
 user_accounts = {}
+mail = None  # الاتصال الرئيسي بـ IMAP
 
-# فتح اتصال البريد مرة واحدة
-mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-mail.login(EMAIL, PASSWORD)
+# إعادة فتح الاتصال في حال الانقطاع
+def ensure_imap_connection():
+    global mail
+    try:
+        # إذا كان الاتصال غير مفتوح
+        if mail is None or mail.state != 'SELECTED':
+            mail = imaplib.IMAP4_SSL(IMAP_SERVER)
+            mail.login(EMAIL, PASSWORD)
+            mail.select("inbox")
+    except Exception as e:
+        print(f"Error reconnecting to IMAP: {e}")
+        mail = None
 
 # دالة لتنظيف النص
 def clean_text(text):
@@ -59,9 +70,9 @@ def fetch_suspended_membership_link(account):
 # دالة مساعدة لجلب الرابط
 def fetch_email_with_link(account, subject_keywords, button_text):
     try:
-        mail.select("inbox")
+        ensure_imap_connection()
         result, data = mail.search(None, 'ALL')
-        mail_ids = data[0].split()[-10:]  # البحث في آخر 10 رسائل فقط
+        mail_ids = data[0].split()[-10:]
 
         for mail_id in reversed(mail_ids):
             result, msg_data = mail.fetch(mail_id, "(RFC822)")
@@ -81,18 +92,16 @@ def fetch_email_with_link(account, subject_keywords, button_text):
                             for a in soup.find_all('a', href=True):
                                 if button_text in a.get_text():
                                     return a['href']
-
-        return None
-
+        return "لم يتم العثور على الرابط المطلوب."
     except Exception as e:
         return f"Error fetching emails: {e}"
 
 # دالة مساعدة لجلب رمز مكون من 4 أرقام
 def fetch_email_with_code(account, subject_keywords):
     try:
-        mail.select("inbox")
+        ensure_imap_connection()
         result, data = mail.search(None, 'ALL')
-        mail_ids = data[0].split()[-10:]  # البحث في آخر 10 رسائل فقط
+        mail_ids = data[0].split()[-10:]
 
         for mail_id in reversed(mail_ids):
             result, msg_data = mail.fetch(mail_id, "(RFC822)")
@@ -111,9 +120,7 @@ def fetch_email_with_code(account, subject_keywords):
                             code_match = re.search(r'\b\d{4}\b', BeautifulSoup(html_content, 'html.parser').get_text())
                             if code_match:
                                 return code_match.group(0)
-
-        return None
-
+        return "لم يتم العثور على الرمز المطلوب."
     except Exception as e:
         return f"Error fetching emails: {e}"
 
@@ -147,7 +154,6 @@ def process_account_name(message):
         bot.send_message(message.chat.id, "اسم الحساب غير موجود ضمن الحسابات المصرح بها. حاول مرة أخرى:")
         bot.register_next_step_handler(message, process_account_name)
 
-# التعامل مع الطلبات
 @bot.message_handler(func=lambda message: message.text in [
     'طلب رابط تحديث السكن', 'طلب رمز السكن', 'طلب استعادة كلمة المرور',
     'طلب رمز تسجيل الدخول', 'طلب رابط عضويتك معلقة'
@@ -155,13 +161,11 @@ def process_account_name(message):
 def handle_requests(message):
     user_name = clean_text(message.from_user.username)
     account = user_accounts.get(user_name)
-
     if not account:
         bot.send_message(message.chat.id, "لم يتم تحديد حساب بعد. أعد تشغيل البوت وأدخل اسم الحساب.")
         return
 
-    bot.send_message(message.chat.id, "جاري الطلب...")  # عرض رسالة جاري الطلب
-
+    bot.send_message(message.chat.id, "جاري الطلب...")
     if message.text == 'طلب رابط تحديث السكن':
         response = fetch_update_address_link(account)
     elif message.text == 'طلب رمز السكن':
@@ -175,19 +179,9 @@ def handle_requests(message):
     else:
         response = "ليس لديك صلاحية لتنفيذ هذا الطلب."
 
-    if response:
-        bot.send_message(message.chat.id, response)
-    else:
-        bot.send_message(message.chat.id, "طلبك غير موجود.")  # إذا لم يتم العثور على شيء
-
-# إعداد Webhook
-@app.route('/' + TOKEN, methods=['POST'])
-def webhook():
-    json_string = request.get_data().decode('utf-8')
-    update = telebot.types.Update.de_json(json_string)
-    bot.process_new_updates([update])
-    return '', 200
+    bot.send_message(message.chat.id, response)
 
 # تشغيل Flask
 if __name__ == '__main__':
+    ensure_imap_connection()
     app.run(host='0.0.0.0', port=5000)
