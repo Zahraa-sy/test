@@ -5,6 +5,7 @@ import imaplib
 import email
 from email.header import decode_header
 from bs4 import BeautifulSoup
+import re
 
 # توكن البوت
 TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
@@ -139,8 +140,3 @@ def webhook():
 # تشغيل Flask
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-
-
-
-
-
