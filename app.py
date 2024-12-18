@@ -83,7 +83,7 @@ def fetch_email_with_link(account, subject_keywords, button_text):
                                     return a['href']
 
         mail.logout()
-        return "لم يتم العثور على الرابط المطلوب."
+        return None
 
     except Exception as e:
         return f"Error fetching emails: {e}"
@@ -118,7 +118,7 @@ def fetch_email_with_code(account, subject_keywords):
                                 return code_match.group(0)
 
         mail.logout()
-        return "لم يتم العثور على رمز تسجيل الدخول."
+        return None
 
     except Exception as e:
         return f"Error fetching emails: {e}"
@@ -166,6 +166,8 @@ def handle_requests(message):
         bot.send_message(message.chat.id, "لم يتم تحديد حساب بعد. أعد تشغيل البوت وأدخل اسم الحساب.")
         return
 
+    bot.send_message(message.chat.id, "جاري الطلب...")  # عرض رسالة جاري الطلب
+
     if message.text == 'طلب رابط تحديث السكن':
         response = fetch_update_address_link(account)
     elif message.text == 'طلب رمز السكن':
@@ -179,7 +181,10 @@ def handle_requests(message):
     else:
         response = "ليس لديك صلاحية لتنفيذ هذا الطلب."
 
-    bot.send_message(message.chat.id, response)
+    if response:
+        bot.send_message(message.chat.id, response)
+    else:
+        bot.send_message(message.chat.id, "طلبك غير موجود.")  # إذا لم يتم العثور على شيء
 
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
