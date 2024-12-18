@@ -32,6 +32,10 @@ allowed_users = {
 
 user_accounts = {}
 
+# فتح اتصال ثابت بالبريد الإلكتروني عند بدء التشغيل
+mail = imaplib.IMAP4_SSL(IMAP_SERVER)
+mail.login(EMAIL, PASSWORD)
+
 # دالة لتنظيف النص
 def clean_text(text):
     return text.strip()
@@ -55,12 +59,9 @@ def fetch_suspended_membership_link(account):
 # دالة مساعدة لجلب الرابط
 def fetch_email_with_link(account, subject_keywords, button_text):
     try:
-        mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-        mail.login(EMAIL, PASSWORD)
         mail.select("inbox")
-
         result, data = mail.search(None, 'ALL')
-        mail_ids = data[0].split()
+        mail_ids = data[0].split()[-10:]  # جلب آخر 10 رسائل فقط
 
         for mail_id in reversed(mail_ids):
             result, msg_data = mail.fetch(mail_id, "(RFC822)")
@@ -79,11 +80,9 @@ def fetch_email_with_link(account, subject_keywords, button_text):
                             soup = BeautifulSoup(html_content, 'html.parser')
                             for a in soup.find_all('a', href=True):
                                 if button_text in a.get_text():
-                                    mail.logout()
                                     return a['href']
 
-        mail.logout()
-        return None
+        return "لم يتم العثور على الرابط المطلوب."
 
     except Exception as e:
         return f"Error fetching emails: {e}"
@@ -91,12 +90,9 @@ def fetch_email_with_link(account, subject_keywords, button_text):
 # دالة مساعدة لجلب رمز مكون من 4 أرقام
 def fetch_email_with_code(account, subject_keywords):
     try:
-        mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-        mail.login(EMAIL, PASSWORD)
         mail.select("inbox")
-
         result, data = mail.search(None, 'ALL')
-        mail_ids = data[0].split()
+        mail_ids = data[0].split()[-10:]  # جلب آخر 10 رسائل فقط
 
         for mail_id in reversed(mail_ids):
             result, msg_data = mail.fetch(mail_id, "(RFC822)")
@@ -114,11 +110,9 @@ def fetch_email_with_code(account, subject_keywords):
                         if account in html_content:
                             code_match = re.search(r'\b\d{4}\b', BeautifulSoup(html_content, 'html.parser').get_text())
                             if code_match:
-                                mail.logout()
                                 return code_match.group(0)
 
-        mail.logout()
-        return None
+        return "لم يتم العثور على رمز تسجيل الدخول."
 
     except Exception as e:
         return f"Error fetching emails: {e}"
@@ -181,10 +175,7 @@ def handle_requests(message):
     else:
         response = "ليس لديك صلاحية لتنفيذ هذا الطلب."
 
-    if response:
-        bot.send_message(message.chat.id, response)
-    else:
-        bot.send_message(message.chat.id, "طلبك غير موجود.")  # إذا لم يتم العثور على شيء
+    bot.send_message(message.chat.id, response if response else "طلبك غير موجود.")  # الرد النهائي
 
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
