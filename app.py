@@ -32,7 +32,7 @@ allowed_users = {
 
 user_accounts = {}
 
-# فتح اتصال ثابت بالبريد الإلكتروني عند بدء التشغيل
+# فتح اتصال البريد مرة واحدة
 mail = imaplib.IMAP4_SSL(IMAP_SERVER)
 mail.login(EMAIL, PASSWORD)
 
@@ -61,7 +61,7 @@ def fetch_email_with_link(account, subject_keywords, button_text):
     try:
         mail.select("inbox")
         result, data = mail.search(None, 'ALL')
-        mail_ids = data[0].split()[-10:]  # جلب آخر 10 رسائل فقط
+        mail_ids = data[0].split()[-10:]  # البحث في آخر 10 رسائل فقط
 
         for mail_id in reversed(mail_ids):
             result, msg_data = mail.fetch(mail_id, "(RFC822)")
@@ -82,7 +82,7 @@ def fetch_email_with_link(account, subject_keywords, button_text):
                                 if button_text in a.get_text():
                                     return a['href']
 
-        return "لم يتم العثور على الرابط المطلوب."
+        return None
 
     except Exception as e:
         return f"Error fetching emails: {e}"
@@ -92,7 +92,7 @@ def fetch_email_with_code(account, subject_keywords):
     try:
         mail.select("inbox")
         result, data = mail.search(None, 'ALL')
-        mail_ids = data[0].split()[-10:]  # جلب آخر 10 رسائل فقط
+        mail_ids = data[0].split()[-10:]  # البحث في آخر 10 رسائل فقط
 
         for mail_id in reversed(mail_ids):
             result, msg_data = mail.fetch(mail_id, "(RFC822)")
@@ -112,7 +112,7 @@ def fetch_email_with_code(account, subject_keywords):
                             if code_match:
                                 return code_match.group(0)
 
-        return "لم يتم العثور على رمز تسجيل الدخول."
+        return None
 
     except Exception as e:
         return f"Error fetching emails: {e}"
@@ -175,7 +175,10 @@ def handle_requests(message):
     else:
         response = "ليس لديك صلاحية لتنفيذ هذا الطلب."
 
-    bot.send_message(message.chat.id, response if response else "طلبك غير موجود.")  # الرد النهائي
+    if response:
+        bot.send_message(message.chat.id, response)
+    else:
+        bot.send_message(message.chat.id, "طلبك غير موجود.")  # إذا لم يتم العثور على شيء
 
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
