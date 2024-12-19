@@ -32,17 +32,18 @@ allowed_users = {
 }
 
 user_accounts = {}
-subscribers = []  # قائمة لتخزين معرفات (chat IDs) المشتركين
 
 # دالة لتنظيف النص
 def clean_text(text):
     return text.strip()
 
+# فتح اتصال البريد مرة واحدة
+mail = imaplib.IMAP4_SSL(IMAP_SERVER)
+mail.login(EMAIL, PASSWORD)
+
 # دوال مساعدة لجلب البيانات
 def fetch_email_with_link(account, subject_keywords, button_text):
     try:
-        mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-        mail.login(EMAIL, PASSWORD)
         mail.select("inbox")
         _, data = mail.search(None, 'ALL')
         mail_ids = data[0].split()[-5:]  # البحث في آخر 5 رسائل فقط
@@ -70,8 +71,6 @@ def fetch_email_with_link(account, subject_keywords, button_text):
 
 def fetch_email_with_code(account, subject_keywords):
     try:
-        mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-        mail.login(EMAIL, PASSWORD)
         mail.select("inbox")
         _, data = mail.search(None, 'ALL')
         mail_ids = data[0].split()[-5:]  # البحث في آخر 5 رسائل فقط
@@ -96,20 +95,32 @@ def fetch_email_with_code(account, subject_keywords):
     except Exception as e:
         return f"Error fetching emails: {e}"
 
+# توابع معالجة الطلبات
+def handle_request_async(chat_id, account, message_text):
+    if message_text == 'طلب رابط تحديث السكن':
+        response = fetch_email_with_link(account, ["تحديث السكن"], "نعم، أنا قدمت الطلب")
+    elif message_text == 'طلب رمز السكن':
+        response = fetch_email_with_link(account, ["رمز الوصول المؤقت"], "الحصول على الرمز")
+    elif message_text == 'طلب استعادة كلمة المرور':
+        response = fetch_email_with_link(account, ["إعادة تعيين كلمة المرور"], "إعادة تعيين كلمة المرور")
+    elif message_text == 'طلب رمز تسجيل الدخول':
+        response = fetch_email_with_code(account, ["رمز تسجيل الدخول"])
+    elif message_text == 'طلب رابط عضويتك معلقة':
+        response = fetch_email_with_link(account, ["عضويتك في Netflix معلّقة"], "إضافة معلومات الدفع")
+    else:
+        response = "ليس لديك صلاحية لتنفيذ هذا الطلب."
+
+    bot.send_message(chat_id, response)
+
 # بدء البوت
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    chat_id = message.chat.id
     telegram_username = clean_text(message.from_user.username)
-
-    if chat_id not in subscribers:  # تسجيل المستخدم إذا لم يكن موجودًا بالفعل
-        subscribers.append(chat_id)
-
     if telegram_username in allowed_users or telegram_username in admin_users:
-        bot.send_message(chat_id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
+        bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
         bot.register_next_step_handler(message, process_account_name)
     else:
-        bot.send_message(chat_id, "غير مصرح لك باستخدام هذا البوت.")
+        bot.send_message(message.chat.id, "غير مصرح لك باستخدام هذا البوت.")
 
 def process_account_name(message):
     user_name = clean_text(message.from_user.username)
@@ -145,33 +156,10 @@ def handle_requests(message):
         return
 
     bot.send_message(message.chat.id, "جاري الطلب...")  # عرض الرسالة فورًا
-    response = {
-        'طلب رابط تحديث السكن': fetch_email_with_link(account, ["تحديث السكن"], "نعم، أنا قدمت الطلب"),
-        'طلب رمز السكن': fetch_email_with_link(account, ["رمز الوصول المؤقت"], "الحصول على الرمز"),
-        'طلب استعادة كلمة المرور': fetch_email_with_link(account, ["إعادة تعيين كلمة المرور"], "إعادة تعيين كلمة المرور"),
-        'طلب رمز تسجيل الدخول': fetch_email_with_code(account, ["رمز تسجيل الدخول"]) if user_name in admin_users else None,
-        'طلب رابط عضويتك معلقة': fetch_email_with_link(account, ["عضويتك في Netflix معلّقة"], "إضافة معلومات الدفع") if user_name in admin_users else None
-    }.get(message.text, "ليس لديك صلاحية.")
-    bot.send_message(message.chat.id, response if response else "طلبك غير موجود.")
 
-# إرسال رسالة جماعية
-@bot.message_handler(commands=['broadcast'])
-def broadcast_message(message):
-    user_name = clean_text(message.from_user.username)
-    if user_name not in admin_users:
-        bot.send_message(message.chat.id, "هذا الأمر مخصص للمسؤولين فقط.")
-        return
-
-    msg = message.text.replace('/broadcast', '').strip()
-    if not msg:
-        bot.send_message(message.chat.id, "يرجى إدخال الرسالة التي ترغب في إرسالها بعد الأمر.")
-        return
-
-    for subscriber in subscribers:
-        try:
-            bot.send_message(subscriber, msg)
-        except Exception as e:
-            print(f"فشل الإرسال للمشترك {subscriber}: {e}")
+    # تنفيذ الطلب في خيط منفصل لتحسين الأداء
+    thread = threading.Thread(target=handle_request_async, args=(message.chat.id, account, message.text))
+    thread.start()
 
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
