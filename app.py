@@ -148,22 +148,26 @@ def process_account_name(message):
     else:
         bot.send_message(message.chat.id, "اسم الحساب غير موجود ضمن الحسابات المصرح بها.")
 
+
 @bot.message_handler(func=lambda message: message.text in [
     'طلب رابط تحديث السكن', 'طلب رمز السكن', 'طلب استعادة كلمة المرور',
-    'طلب رمز تسجيل الدخول', 'طلب رابط عضويتك معلقة','إرسال رسالة جماعية'
+    'طلب رمز تسجيل الدخول', 'طلب رابط عضويتك معلقة', 'إرسال رسالة جماعية'
 ])
 def handle_requests(message):
     user_name = clean_text(message.from_user.username)
     account = user_accounts.get(user_name)
+    if message.text == 'إرسال رسالة جماعية' and user_name in admin_users:
+        handle_broadcast_request(message)
+        return
+
     if not account:
         bot.send_message(message.chat.id, "لم يتم تحديد حساب بعد.")
         return
 
-    bot.send_message(message.chat.id, "جاري الطلب...")  # عرض الرسالة فورًا
-
-    # تنفيذ الطلب في خيط منفصل لتحسين الأداء
+    bot.send_message(message.chat.id, "جاري الطلب...")
     thread = threading.Thread(target=handle_request_async, args=(message.chat.id, account, message.text))
     thread.start()
+
 # التعامل مع إرسال الرسائل الجماعية من قبل الأدمن
 @bot.message_handler(func=lambda message: message.text == 'إرسال رسالة جماعية' and message.from_user.username in admin_users)
 def handle_broadcast_request(message):
