@@ -6,7 +6,7 @@ import email
 from email.header import decode_header
 from bs4 import BeautifulSoup
 import re
-import time  # مكتبة لتأخير المحاولات
+import threading  # مكتبة الخيوط لتحسين الأداء
 
 # توكن البوت
 TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
@@ -37,50 +37,16 @@ user_accounts = {}
 def clean_text(text):
     return text.strip()
 
-# دالة إعادة المحاولة للاتصال بالخادم
-def retry_on_error(func):
-    def wrapper(*args, **kwargs):
-        retries = 3  # عدد المحاولات
-        for attempt in range(retries):
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                if "EOF occurred" in str(e) or "socket" in str(e):
-                    time.sleep(2)  # تأخير قبل إعادة المحاولة
-                    print(f"إعادة المحاولة... المحاولة {attempt + 1}/{retries}")
-                else:
-                    return f"Error fetching emails: {e}"
-        return "فشل الاتصال بالخادم بعد عدة محاولات."
-    return wrapper
+# فتح اتصال البريد مرة واحدة
+mail = imaplib.IMAP4_SSL(IMAP_SERVER)
+mail.login(EMAIL, PASSWORD)
 
-# توابع استخراج البيانات
-@retry_on_error
-def fetch_update_address_link(account):
-    return fetch_email_with_link(account, ["تحديث السكن"], "نعم، أنا قدمت الطلب")
-
-@retry_on_error
-def fetch_temporary_code_link(account):
-    return fetch_email_with_link(account, ["رمز الوصول المؤقت"], "الحصول على الرمز")
-
-@retry_on_error
-def fetch_reset_password_link(account):
-    return fetch_email_with_link(account, ["إعادة تعيين كلمة المرور"], "إعادة تعيين كلمة المرور")
-
-@retry_on_error
-def fetch_login_code(account):
-    return fetch_email_with_code(account, ["رمز تسجيل الدخول"])
-
-@retry_on_error
-def fetch_suspended_membership_link(account):
-    return fetch_email_with_link(account, ["عضويتك في Netflix معلّقة"], "إضافة معلومات الدفع")
-
-# دوال مساعدة
+# دوال مساعدة لجلب البيانات
 def fetch_email_with_link(account, subject_keywords, button_text):
-    with imaplib.IMAP4_SSL(IMAP_SERVER) as mail:
-        mail.login(EMAIL, PASSWORD)
+    try:
         mail.select("inbox")
         _, data = mail.search(None, 'ALL')
-        mail_ids = data[0].split()[-10:]
+        mail_ids = data[0].split()[-5:]  # البحث في آخر 5 رسائل فقط
 
         for mail_id in reversed(mail_ids):
             _, msg_data = mail.fetch(mail_id, "(RFC822)")
@@ -99,14 +65,15 @@ def fetch_email_with_link(account, subject_keywords, button_text):
                             for a in soup.find_all('a', href=True):
                                 if button_text in a.get_text():
                                     return a['href']
-        return None
+        return "طلبك غير موجود."
+    except Exception as e:
+        return f"Error fetching emails: {e}"
 
 def fetch_email_with_code(account, subject_keywords):
-    with imaplib.IMAP4_SSL(IMAP_SERVER) as mail:
-        mail.login(EMAIL, PASSWORD)
+    try:
         mail.select("inbox")
         _, data = mail.search(None, 'ALL')
-        mail_ids = data[0].split()[-10:]
+        mail_ids = data[0].split()[-5:]  # البحث في آخر 5 رسائل فقط
 
         for mail_id in reversed(mail_ids):
             _, msg_data = mail.fetch(mail_id, "(RFC822)")
@@ -124,7 +91,26 @@ def fetch_email_with_code(account, subject_keywords):
                             code_match = re.search(r'\b\d{4}\b', BeautifulSoup(html_content, 'html.parser').get_text())
                             if code_match:
                                 return code_match.group(0)
-        return None
+        return "طلبك غير موجود."
+    except Exception as e:
+        return f"Error fetching emails: {e}"
+
+# توابع معالجة الطلبات
+def handle_request_async(chat_id, account, message_text):
+    if message_text == 'طلب رابط تحديث السكن':
+        response = fetch_email_with_link(account, ["تحديث السكن"], "نعم، أنا قدمت الطلب")
+    elif message_text == 'طلب رمز السكن':
+        response = fetch_email_with_link(account, ["رمز الوصول المؤقت"], "الحصول على الرمز")
+    elif message_text == 'طلب استعادة كلمة المرور':
+        response = fetch_email_with_link(account, ["إعادة تعيين كلمة المرور"], "إعادة تعيين كلمة المرور")
+    elif message_text == 'طلب رمز تسجيل الدخول':
+        response = fetch_email_with_code(account, ["رمز تسجيل الدخول"])
+    elif message_text == 'طلب رابط عضويتك معلقة':
+        response = fetch_email_with_link(account, ["عضويتك في Netflix معلّقة"], "إضافة معلومات الدفع")
+    else:
+        response = "ليس لديك صلاحية لتنفيذ هذا الطلب."
+
+    bot.send_message(chat_id, response)
 
 # بدء البوت
 @bot.message_handler(commands=['start'])
@@ -169,16 +155,12 @@ def handle_requests(message):
         bot.send_message(message.chat.id, "لم يتم تحديد حساب بعد.")
         return
 
-    bot.send_message(message.chat.id, "جاري الطلب...")
-    response = {
-        'طلب رابط تحديث السكن': fetch_update_address_link(account),
-        'طلب رمز السكن': fetch_temporary_code_link(account),
-        'طلب استعادة كلمة المرور': fetch_reset_password_link(account),
-        'طلب رمز تسجيل الدخول': fetch_login_code(account) if user_name in admin_users else None,
-        'طلب رابط عضويتك معلقة': fetch_suspended_membership_link(account) if user_name in admin_users else None
-    }.get(message.text, "ليس لديك صلاحية.")
+    bot.send_message(message.chat.id, "جاري الطلب...")  # عرض الرسالة فورًا
 
-    bot.send_message(message.chat.id, response if response else "طلبك غير موجود.")
+    # تنفيذ الطلب في خيط منفصل لتحسين الأداء
+    thread = threading.Thread(target=handle_request_async, args=(message.chat.id, account, message.text))
+    thread.start()
+
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
 def webhook():
@@ -186,6 +168,7 @@ def webhook():
     update = telebot.types.Update.de_json(json_string)
     bot.process_new_updates([update])
     return '', 200
+
 # تشغيل Flask
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
