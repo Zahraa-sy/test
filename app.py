@@ -32,6 +32,7 @@ allowed_users = {
 }
 
 user_accounts = {}
+subscribers =  ["Ray2ak", "flix511", "Lamak_8"]
 
 # دالة لتنظيف النص
 def clean_text(text):
@@ -116,11 +117,14 @@ def handle_request_async(chat_id, account, message_text):
 @bot.message_handler(commands=['start'])
 def start_message(message):
     telegram_username = clean_text(message.from_user.username)
+    chat_id = message.chat.id
+
     if telegram_username in allowed_users or telegram_username in admin_users:
-        bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
+        add_subscriber(chat_id)
+        bot.send_message(chat_id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
         bot.register_next_step_handler(message, process_account_name)
     else:
-        bot.send_message(message.chat.id, "غير مصرح لك باستخدام هذا البوت.")
+        bot.send_message(chat_id, "غير مصرح لك باستخدام هذا البوت.")
 
 def process_account_name(message):
     user_name = clean_text(message.from_user.username)
@@ -137,7 +141,8 @@ def process_account_name(message):
         if user_name in admin_users:
             btns.extend([
                 types.KeyboardButton('طلب رمز تسجيل الدخول'),
-                types.KeyboardButton('طلب رابط عضويتك معلقة')
+                types.KeyboardButton('طلب رابط عضويتك معلقة'),
+                types.KeyboardButton('إرسال رسالة جماعية')  # زر جديد لإرسال رسالة جماعية
             ])
         markup.add(*btns)
         bot.send_message(message.chat.id, "اختر العملية المطلوبة:", reply_markup=markup)
@@ -146,7 +151,7 @@ def process_account_name(message):
 
 @bot.message_handler(func=lambda message: message.text in [
     'طلب رابط تحديث السكن', 'طلب رمز السكن', 'طلب استعادة كلمة المرور',
-    'طلب رمز تسجيل الدخول', 'طلب رابط عضويتك معلقة'
+    'طلب رمز تسجيل الدخول', 'طلب رابط عضويتك معلقة','إرسال رسالة جماعية'
 ])
 def handle_requests(message):
     user_name = clean_text(message.from_user.username)
@@ -160,7 +165,20 @@ def handle_requests(message):
     # تنفيذ الطلب في خيط منفصل لتحسين الأداء
     thread = threading.Thread(target=handle_request_async, args=(message.chat.id, account, message.text))
     thread.start()
+# التعامل مع إرسال الرسائل الجماعية من قبل الأدمن
+@bot.message_handler(func=lambda message: message.text == 'إرسال رسالة جماعية' and message.from_user.username in admin_users)
+def handle_broadcast_request(message):
+    bot.send_message(message.chat.id, "اكتب الرسالة التي تريد إرسالها لجميع المشتركين:")
+    bot.register_next_step_handler(message, send_broadcast_message)
 
+def send_broadcast_message(message):
+    broadcast_text = message.text
+    for chat_id in subscribers:
+        try:
+            bot.send_message(chat_id, f"📢 رسالة من الإدارة:\n{broadcast_text}")
+        except Exception as e:
+            print(f"فشل الإرسال إلى {chat_id}: {e}")
+    bot.send_message(message.chat.id, "✅ تم إرسال الرسالة إلى جميع المشتركين بنجاح.")
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
 def webhook():
