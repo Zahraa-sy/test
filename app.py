@@ -117,14 +117,13 @@ def handle_request_async(chat_id, account, message_text):
 @bot.message_handler(commands=['start'])
 def start_message(message):
     telegram_username = clean_text(message.from_user.username)
-    chat_id = message.chat.id
-
     if telegram_username in allowed_users or telegram_username in admin_users:
-        add_subscriber(chat_id)
-        bot.send_message(chat_id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
+        bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
         bot.register_next_step_handler(message, process_account_name)
     else:
-        bot.send_message(chat_id, "غير مصرح لك باستخدام هذا البوت.")
+        bot.send_message(message.chat.id, "غير مصرح لك باستخدام هذا البوت.")
+
+
 
 def process_account_name(message):
     user_name = clean_text(message.from_user.username)
