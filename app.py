@@ -26,6 +26,12 @@ admin_users = ["Ray2ak", "flix511", "Lamak_8"]
 
 # المستخدمون المصرح لهم وحساباتهم
 allowed_users = {
+    "naserc5":[],
+      "FaisalAli": [
+        "good45@flix1.me", "good46@flix1.me", "good47@flix1.me", "good48@flix1.me",
+        "good49@flix1.me", "good50@flix1.me", "good51@flix1.me", "good52@flix1.me",
+        "good53@flix1.me", "good54@flix1.me"
+    ],
     "Ray2ak": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me"],
     "flix511": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me", "e49@flix1.me", "d87@flix1.me", "d7@flix1.me", "yes34@flix1.me", "yes33@flix1.me",
         "good25@flix1.me", "good26@flix1.me", "good27@flix1.me", "good28@flix1.me", "good29@flix1.me",
@@ -148,9 +154,7 @@ allowed_users = {
 }
 
 user_accounts = {}
-subscribers =  [7304537096,7177902677, 7242814551,502281152
-
-]
+subscribers =  [7304537096,7177902677, 7242814551,502281152,6766780038, 971651970]
 
 # دالة لتنظيف النص
 def clean_text(text):
