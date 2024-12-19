@@ -6,6 +6,7 @@ import email
 from email.header import decode_header
 from bs4 import BeautifulSoup
 import re
+import time
 import threading  # مكتبة الخيوط لتحسين الأداء
 
 # توكن البوت
@@ -159,12 +160,30 @@ def clean_text(text):
 mail = imaplib.IMAP4_SSL(IMAP_SERVER)
 mail.login(EMAIL, PASSWORD)
 
-# دوال مساعدة لجلب البيانات
+
+# دالة إعادة المحاولة عند حدوث أخطاء
+def retry_on_error(func):
+    def wrapper(*args, **kwargs):
+        retries = 3
+        for attempt in range(retries):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                if "EOF occurred" in str(e) or "socket" in str(e):
+                    time.sleep(2)
+                    print(f"Retrying... Attempt {attempt + 1}/{retries}")
+                else:
+                    return f"Error fetching emails: {e}"
+        return "Error: Failed after multiple retries."
+    return wrapper
+
+# تغليف دوال جلب البيانات بدالة إعادة المحاولة
+@retry_on_error
 def fetch_email_with_link(account, subject_keywords, button_text):
     try:
         mail.select("inbox")
         _, data = mail.search(None, 'ALL')
-        mail_ids = data[0].split()[-5:]  # البحث في آخر 5 رسائل فقط
+        mail_ids = data[0].split()[-5:]
 
         for mail_id in reversed(mail_ids):
             _, msg_data = mail.fetch(mail_id, "(RFC822)")
@@ -191,7 +210,7 @@ def fetch_email_with_code(account, subject_keywords):
     try:
         mail.select("inbox")
         _, data = mail.search(None, 'ALL')
-        mail_ids = data[0].split()[-5:]  # البحث في آخر 5 رسائل فقط
+        mail_ids = data[0].split()[-5:]
 
         for mail_id in reversed(mail_ids):
             _, msg_data = mail.fetch(mail_id, "(RFC822)")
@@ -212,7 +231,7 @@ def fetch_email_with_code(account, subject_keywords):
         return "طلبك غير موجود."
     except Exception as e:
         return f"Error fetching emails: {e}"
-
+        
 # توابع معالجة الطلبات
 def handle_request_async(chat_id, account, message_text):
     if message_text == 'طلب رابط تحديث السكن':
