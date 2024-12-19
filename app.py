@@ -32,7 +32,7 @@ allowed_users = {
 }
 
 user_accounts = {}
-subscribers =  ["Ray2ak", "flix511", "Lamak_8"]
+subscribers =  [6178808861,1878193179]
 
 # دالة لتنظيف النص
 def clean_text(text):
