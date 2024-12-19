@@ -159,7 +159,19 @@ def clean_text(text):
 # فتح اتصال البريد مرة واحدة
 mail = imaplib.IMAP4_SSL(IMAP_SERVER)
 mail.login(EMAIL, PASSWORD)
-
+# دالة إعادة المحاولة عند حدوث أخطاء
+def retry_imap_connection():
+    global mail
+    for attempt in range(3):
+        try:
+            mail = imaplib.IMAP4_SSL(IMAP_SERVER)
+            mail.login(EMAIL, PASSWORD)
+            print("✅ اتصال IMAP ناجح.")
+            return
+        except Exception as e:
+            print(f"❌ فشل الاتصال (المحاولة {attempt + 1}): {e}")
+            time.sleep(2)
+    print("❌ فشل إعادة الاتصال بعد عدة محاولات.")
 
 # دالة إعادة المحاولة عند حدوث أخطاء
 def retry_on_error(func):
@@ -180,6 +192,7 @@ def retry_on_error(func):
 # تغليف دوال جلب البيانات بدالة إعادة المحاولة
 @retry_on_error
 def fetch_email_with_link(account, subject_keywords, button_text):
+    retry_imap_connection()
     try:
         mail.select("inbox")
         _, data = mail.search(None, 'ALL')
@@ -207,6 +220,7 @@ def fetch_email_with_link(account, subject_keywords, button_text):
         return f"Error fetching emails: {e}"
 
 def fetch_email_with_code(account, subject_keywords):
+    retry_imap_connection()
     try:
         mail.select("inbox")
         _, data = mail.search(None, 'ALL')
