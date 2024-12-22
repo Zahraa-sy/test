@@ -29,7 +29,9 @@ allowed_users = {
     "oscar_hrb": [
         "good20@flix1.me",
         "good18@flix1.me",
-        "good19@flix1.me"
+        "good19@flix1.me",
+        "c91@flix1.me ",
+"a94@flix1.me"
     ],
     "lp_o1": [
         "good45@flix1.me",
