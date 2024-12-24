@@ -379,7 +379,8 @@ def process_account_name(message):
                 types.KeyboardButton('إضافة حسابات للبيع'),
                 types.KeyboardButton('عرض الحسابات للبيع'),
                 types.KeyboardButton('إضافة حسابات لمستخدم'),
-                 types.KeyboardButton('حذف حسابات من مستخدم'), 
+                types.KeyboardButton('حذف حسابات من المعروضة للبيع'),
+                types.KeyboardButton('حذف حسابات من مستخدم'), 
                 types.KeyboardButton('إرسال رسالة جماعية')  # زر جديد لإرسال رسالة جماعية
             ])
         markup.add(*btns)
@@ -508,6 +509,32 @@ def show_accounts_for_sale(message):
     else:
         response = "❌ لا توجد حسابات معروضة للبيع حاليًا."
     bot.send_message(message.chat.id, response)
+
+@bot.message_handler(func=lambda message: message.text == 'حذف حسابات من المعروضة للبيع' and message.from_user.username in admin_users)
+def remove_accounts_from_sale(message):
+    bot.send_message(message.chat.id, "📝 أرسل الحسابات التي تريد حذفها من المعروضة للبيع (حساب بكل سطر):")
+    bot.register_next_step_handler(message, process_accounts_removal)
+
+def process_accounts_removal(message):
+    accounts_to_remove = message.text.split("\n")  # قراءة الحسابات كمجموعة نصوص
+    removed_accounts = []
+    not_found_accounts = []
+
+    for account in accounts_to_remove:
+        account = account.strip()
+        if account in accounts_for_sale:
+            accounts_for_sale.remove(account)
+            removed_accounts.append(account)
+        else:
+            not_found_accounts.append(account)
+
+    # إعداد الرد
+    response = "✅ الحسابات التالية تم حذفها بنجاح:\n" + "\n".join(removed_accounts) if removed_accounts else "❌ لم يتم حذف أي حساب."
+    if not_found_accounts:
+        response += "\n\n⚠️ الحسابات التالية لم يتم العثور عليها:\n" + "\n".join(not_found_accounts)
+
+    bot.send_message(message.chat.id, response)
+
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
 def webhook():
