@@ -231,7 +231,7 @@ allowed_users = {
         "a53@flix1.me"
     ],
 }
-
+accounts_for_sale = []
 user_accounts = {}
 subscribers =  [7304537096,7177902677, 7242814551,502281152,6766780038, 971651970,5520714242]
 
@@ -369,11 +369,17 @@ def process_account_name(message):
             types.KeyboardButton('طلب رابط تحديث السكن'),
             types.KeyboardButton('طلب رمز السكن'),
             types.KeyboardButton('طلب استعادة كلمة المرور'),
+            types.KeyboardButton('عرض الحسابات المرتبطة بي'),
+            types.KeyboardButton('عرض الحسابات المعروضة للبيع')
         ]
         if user_name in admin_users:
             btns.extend([
                 types.KeyboardButton('طلب رمز تسجيل الدخول'),
                 types.KeyboardButton('طلب رابط عضويتك معلقة'),
+                types.KeyboardButton('إضافة حسابات للبيع'),
+                types.KeyboardButton('عرض الحسابات للبيع'),
+                types.KeyboardButton('إضافة حسابات لمستخدم'),
+                 types.KeyboardButton('حذف حسابات من مستخدم'), 
                 types.KeyboardButton('إرسال رسالة جماعية')  # زر جديد لإرسال رسالة جماعية
             ])
         markup.add(*btns)
@@ -400,7 +406,23 @@ def handle_requests(message):
     bot.send_message(message.chat.id, "جاري الطلب...")
     thread = threading.Thread(target=handle_request_async, args=(message.chat.id, account, message.text))
     thread.start()
+@bot.message_handler(func=lambda message: message.text == 'إضافة حسابات للبيع' and message.from_user.username in admin_users)
+def add_accounts_for_sale(message):
+    bot.send_message(message.chat.id, "📝 الرجاء إدخال الحسابات (كل حساب في سطر):")
+    bot.register_next_step_handler(message, save_accounts_for_sale)
 
+def save_accounts_for_sale(message):
+    new_accounts = message.text.strip().split('\n')  # فصل الحسابات بناءً على السطور
+    accounts_for_sale.extend(new_accounts)  # إضافة الحسابات إلى القائمة
+    bot.send_message(message.chat.id, "✅ تم إضافة الحسابات إلى قائمة البيع بنجاح.")
+
+@bot.message_handler(func=lambda message: message.text == 'عرض الحسابات للبيع' and message.from_user.username in admin_users)
+def show_accounts_for_sale(message):
+    if not accounts_for_sale:
+        bot.send_message(message.chat.id, "❌ لا توجد حسابات متوفرة للبيع حاليًا.")
+    else:
+        accounts_text = "\n".join(accounts_for_sale)  # تحويل القائمة إلى سلسلة نصوص
+        bot.send_message(message.chat.id, f"📋 الحسابات المتوفرة للبيع:\n{accounts_text}")
 # التعامل مع إرسال الرسائل الجماعية من قبل الأدمن
 @bot.message_handler(func=lambda message: message.text == 'إرسال رسالة جماعية' and message.from_user.username in admin_users)
 def handle_broadcast_request(message):
@@ -415,6 +437,77 @@ def send_broadcast_message(message):
         except Exception as e:
             print(f"فشل الإرسال إلى {chat_id}: {e}")
     bot.send_message(message.chat.id, "✅ تم إرسال الرسالة إلى جميع المشتركين بنجاح.")
+@bot.message_handler(func=lambda message: message.text == 'حذف حسابات من مستخدم' and message.from_user.username in admin_users)
+def delete_user_accounts_start(message):
+    bot.send_message(message.chat.id, "📝 الرجاء إدخال اسم المستخدم:")
+    bot.register_next_step_handler(message, handle_user_deletion_choice)
+
+def handle_user_deletion_choice(message):
+    user_to_edit = message.text.strip()
+    if user_to_edit not in allowed_users:
+        bot.send_message(message.chat.id, "❌ المستخدم غير موجود في قائمة المستخدمين المسموح لهم.")
+        return
+
+    # عرض الخيارات للأدمن
+    markup = types.ReplyKeyboardMarkup(row_width=1, one_time_keyboard=True)
+    btns = [
+        types.KeyboardButton('حذف جميع الحسابات'),
+        types.KeyboardButton('حذف حسابات محددة')
+    ]
+    markup.add(*btns)
+    bot.send_message(message.chat.id, "⚙️ اختر الإجراء المطلوب:", reply_markup=markup)
+    bot.register_next_step_handler(message, handle_deletion_action, user_to_edit)
+
+def handle_deletion_action(message, user_to_edit):
+    if message.text == 'حذف جميع الحسابات':
+        delete_all_accounts(user_to_edit, message.chat.id)
+    elif message.text == 'حذف حسابات محددة':
+        bot.send_message(message.chat.id, "📝 الرجاء إدخال الحسابات التي تريد حذفها (كل حساب في سطر):")
+        bot.register_next_step_handler(message, delete_specific_accounts, user_to_edit)
+    else:
+        bot.send_message(message.chat.id, "❌ خيار غير صحيح. الرجاء المحاولة مجددًا.")
+
+def delete_all_accounts(user_to_edit, chat_id):
+    allowed_users.pop(user_to_edit, None)  # حذف المستخدم وكل حساباته
+    bot.send_message(chat_id, f"✅ تم حذف المستخدم {user_to_edit} وجميع حساباته بنجاح.")
+
+def delete_specific_accounts(message, user_to_edit):
+    accounts_to_delete = message.text.strip().split('\n')  # فصل الحسابات بناءً على السطور
+    if user_to_edit in allowed_users:
+        current_accounts = allowed_users[user_to_edit]
+        for account in accounts_to_delete:
+            if account in current_accounts:
+                current_accounts.remove(account)  # حذف الحساب من قائمة المستخدم
+
+        # تحديث القائمة
+        if not current_accounts:  # إذا أصبحت القائمة فارغة، حذف المستخدم
+            allowed_users.pop(user_to_edit, None)
+            bot.send_message(message.chat.id, f"✅ تم حذف جميع الحسابات من المستخدم {user_to_edit} وحذف المستخدم من القائمة.")
+        else:
+            allowed_users[user_to_edit] = current_accounts
+            bot.send_message(message.chat.id, f"✅ تم حذف الحسابات المحددة من المستخدم {user_to_edit}.")
+    else:
+        bot.send_message(message.chat.id, "❌ المستخدم غير موجود أو لا يملك أي حسابات.")
+
+
+@bot.message_handler(func=lambda message: message.text == 'عرض الحسابات المرتبطة بي')
+def show_user_accounts(message):
+    user_name = clean_text(message.from_user.username)
+    if user_name in allowed_users and allowed_users[user_name]:
+        accounts = allowed_users[user_name]
+        response = "✅ الحسابات المرتبطة بك:\n" + "\n".join(accounts)
+    else:
+        response = "❌ لا توجد حسابات مرتبطة بحسابك."
+    bot.send_message(message.chat.id, response)
+
+
+@bot.message_handler(func=lambda message: message.text == 'عرض الحسابات المعروضة للبيع')
+def show_accounts_for_sale(message):
+    if accounts_for_sale:
+        response = "📋 الحسابات المعروضة للبيع:\n" + "\n".join(accounts_for_sale)
+    else:
+        response = "❌ لا توجد حسابات معروضة للبيع حاليًا."
+    bot.send_message(message.chat.id, response)
 # إعداد Webhook
 @app.route('/' + TOKEN, methods=['POST'])
 def webhook():
