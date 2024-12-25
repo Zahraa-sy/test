@@ -106,7 +106,9 @@ allowed_users = {
         "b11@flix1.me", "b19@flix1.me", "b20@flix1.me", "b21@flix1.me", "b22@flix1.me",
         "yes30@flix1.me", "yes31@flix1.me", "e46@flix1.me", "c55@flix1.me", "c56@flix1.me"],
     "Lamak_8": ["d41@flix1.me", "d42@flix1.me", "d43@flix1.me", "c15@flix1.me", "c23@flix1.me"],
-      "mo123123mm":[
+      "mo123123mm":[ "good29@flix1.me","good30@flix1.me","good32@flix1.me",
+                    "good31@flix1.me","good33@flix1.me",  
+          "good25@flix1.me","good26@flix1.me","good27@flix1.me",   
     "good35@flix1.me", "good36@flix1.me", "good37@flix1.me", "good38@flix1.me", "good39@flix1.me",
     "good40@flix1.me", "good41@flix1.me", "good42@flix1.me", "good43@flix1.me", "good44@flix1.me",
     "e29@flix1.me", "e23@flix1.me", "e24@flix1.me", "e25@flix1.me", "c24@flix1.me", "c26@flix1.me",
