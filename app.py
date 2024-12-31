@@ -16,7 +16,7 @@ from pymongo import MongoClient
 # ----------------------------------
 # إعدادات MongoDB
 # ----------------------------------
-MONGO_URI = "mongodb+srv://azal12345zz:KhKZxYFldC2Uz5BC@cluster0.fruat.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"  # عدّل الرابط بما يناسبك
+MONGO_URI = "mongodb+srv://azal12345zz:KhKZxYFldC2Uz5BC@cluster0.fruat.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 client = MongoClient(MONGO_URI)
 DB_NAME = "mydatabase"
 db = client[DB_NAME]
@@ -288,6 +288,8 @@ def process_account_name(message):
                 types.KeyboardButton('إضافة حسابات لمستخدم'),
                 types.KeyboardButton('حذف مستخدم مع جميع حساباته'),
                 types.KeyboardButton('حذف جزء من حسابات المستخدم'),
+                # (جديد) إضافة زر لإضافة مشترك
+                types.KeyboardButton('إضافة مشترك')  # <<=== زر جديد
             ])
         # زر شراء حساب من القائمة المعروضة للبيع (مسموح أيضًا للمستخدم العادي)
         btns.append(types.KeyboardButton('شراء حساب من المعروضة للبيع'))
@@ -369,10 +371,6 @@ def process_accounts_removal(message):
 # ----------------------------------
 @bot.message_handler(func=lambda message: message.text == 'شراء حساب من المعروضة للبيع')
 def buy_account_from_sale_start(message):
-    """
-    - المستخدم العادي بإمكانه شراء أي حساب/حسابات من المعروضة.
-    - يمكن إدخال أكثر من حساب في سطور متعددة.
-    """
     bot.send_message(message.chat.id, "📝 أرسل الحسابات التي تريد شراءها (كل حساب في سطر):")
     bot.register_next_step_handler(message, process_buy_accounts)
 
@@ -387,10 +385,8 @@ def process_buy_accounts(message):
     for acc in wanted_accounts:
         acc_clean = acc.strip()
         if acc_clean in available_accounts:
-            # إزالة من قائمة البيع
-            remove_accounts_from_sale([acc_clean])
-            # إضافته للمستخدم
-            add_allowed_user_account(user_name, acc_clean)
+            remove_accounts_from_sale([acc_clean])         
+            add_allowed_user_account(user_name, acc_clean) 
             purchased.append(acc_clean)
         else:
             not_found.append(acc_clean)
@@ -472,13 +468,37 @@ def process_delete_part_step1(message):
     bot.send_message(message.chat.id,
                      f"✅ لدى المستخدم {user_to_edit} الحسابات التالية:\n"
                      + "\n".join(current_accounts)
-                     + "\n📝 أرسل الحسابات التي تريد حذفها (حساب في كل سطر):")
+                     + "\n📝 أرسل الحسابات التي تريد حذفها (حساب بكل سطر):")
     bot.register_next_step_handler(message, process_delete_part_step2, user_to_edit)
 
 def process_delete_part_step2(message, user_to_edit):
     accounts_to_delete = message.text.strip().split('\n')
     delete_allowed_accounts(user_to_edit, accounts_to_delete)
     bot.send_message(message.chat.id, f"✅ تم حذف الحسابات المطلوبة من المستخدم {user_to_edit}.")
+
+
+# ----------------------------------
+# (جديد) إضافة مشترك
+# ----------------------------------
+@bot.message_handler(func=lambda message: message.text == "إضافة مشترك")
+def add_subscriber_handler(message):
+    """
+    زر خاص بالأدمن لإضافة Chat ID إلى قائمة المشتركين
+    """
+    user_name = message.from_user.username
+    if not is_admin(user_name):
+        return bot.send_message(message.chat.id, "❌ أنت لست أدمن.")
+    
+    bot.send_message(message.chat.id, "📝 الرجاء إدخال الـ Chat ID المراد إضافته للمشتركين:")
+    bot.register_next_step_handler(message, process_subscriber_id)
+
+def process_subscriber_id(message):
+    try:
+        chat_id_to_add = int(message.text.strip())
+        add_subscriber(chat_id_to_add)
+        bot.send_message(message.chat.id, f"✅ تم إضافة المشترك {chat_id_to_add} بنجاح إلى قائمة المشتركين.")
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ الرجاء إدخال رقم صحيح للـ Chat ID.")
 
 # ----------------------------------
 # إرسال رسالة جماعية (للأدمن)
