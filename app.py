@@ -103,7 +103,7 @@ def delete_allowed_accounts(username: str, accounts: list = None):
         return
 
     if not accounts:
-        # احذف المستخدم كليًا أو على الأقل أفرغ قائمة accounts
+        # احذف المستخدم كليًا أو أفرغ قائمة accounts
         users_coll.update_one(
             {"username": username},
             {"$set": {"accounts": []}}
@@ -315,19 +315,22 @@ def process_account_name(message):
         user_accounts[user_name] = account_name
 
         markup = types.ReplyKeyboardMarkup(row_width=1)
+        # أزرار عامة للمستخدم العادي
         btns = [
             types.KeyboardButton('طلب رابط تحديث السكن'),
             types.KeyboardButton('طلب رمز السكن'),
             types.KeyboardButton('طلب استعادة كلمة المرور'),
             types.KeyboardButton('عرض الحسابات المرتبطة بي'),
-            types.KeyboardButton('عرض الحسابات المعروضة للبيع')
+            # بدل "عرض الحسابات المعروضة للبيع" -> "شراء حسابات للبيع"
+            types.KeyboardButton('شراء حسابات للبيع')
         ]
+        # أزرار إضافية للأدمن
         if is_admin(user_name):
             btns.extend([
                 types.KeyboardButton('طلب رمز تسجيل الدخول'),
                 types.KeyboardButton('طلب رابط عضويتك معلقة'),
                 types.KeyboardButton('إضافة حسابات للبيع'),
-                types.KeyboardButton('عرض الحسابات للبيع'),
+                types.KeyboardButton('عرض الحسابات للبيع'),  # للأدمن فقط
                 types.KeyboardButton('حذف حسابات من المعروضة للبيع'),
                 types.KeyboardButton('إرسال رسالة جماعية'),
                 types.KeyboardButton('إضافة مستخدم جديد'),
@@ -335,11 +338,8 @@ def process_account_name(message):
                 types.KeyboardButton('حذف مستخدم مع جميع حساباته'),
                 types.KeyboardButton('حذف جزء من حسابات المستخدم'),
                 types.KeyboardButton('إضافة مشترك'),
-                # (جديد) زر عرض عدد المستخدمين
                 types.KeyboardButton('عرض عدد المستخدمين')
             ])
-        btns.append(types.KeyboardButton('شراء حساب من المعروضة للبيع'))
-
         markup.add(*btns)
         bot.send_message(message.chat.id, "اختر العملية المطلوبة:", reply_markup=markup)
     else:
@@ -395,6 +395,9 @@ def save_accounts_for_sale(message):
 
 @bot.message_handler(func=lambda message: message.text in ['عرض الحسابات للبيع', 'عرض الحسابات المعروضة للبيع'])
 def show_accounts_for_sale_handler(message):
+    """
+    هذا الزر للأدمن فقط (إذا أردت). المستخدم العادي لا يراه.
+    """
     accounts = get_accounts_for_sale()
     if not accounts:
         bot.send_message(message.chat.id, "❌ لا توجد حسابات متوفرة للبيع حاليًا.")
@@ -417,27 +420,28 @@ def process_accounts_removal(message):
 # ----------------------------------
 # شراء عدد معين من الحسابات (مسموح للمستخدم العادي)
 # ----------------------------------
-@bot.message_handler(func=lambda message: message.text == 'شراء حساب من المعروضة للبيع')
+@bot.message_handler(func=lambda message: message.text == 'شراء حسابات للبيع')
 def buy_account_from_sale_start(message):
     """
-    بدلاً من إدخال الحسابات سطرًا بسطر، 
-    سنعرض له عدد الحسابات المتوفرة ونطلب منه إدخال عدد يريد شراءه.
+    عند النقر على زر "شراء حسابات للبيع"،
+    نعرض عدد الحسابات المتوفرة ثم يطلب عدد يريد شراءه.
     """
     available_accounts = get_accounts_for_sale()
     if not available_accounts:
         return bot.send_message(message.chat.id, "❌ لا توجد حسابات للبيع حالياً.")
     # عرض عدد الحسابات المتاحة
-    bot.send_message(message.chat.id, f"يوجد حالياً {len(available_accounts)} حساب معروض للبيع.\n"
-                                      "كم عدد الحسابات التي ترغب بشرائها؟")
+    count_available = len(available_accounts)
+    bot.send_message(message.chat.id,
+                     f"يوجد حالياً {count_available} حساب معروض للبيع.\n"
+                     "كم حساباً ترغب بشرائه؟")
     bot.register_next_step_handler(message, process_buy_accounts_count)
 
 def process_buy_accounts_count(message):
-    """
-    يستلم عدد الحسابات التي يرغب المستخدم بشرائها.
-    ثم نأخذ من بداية قائمة البيع هذا العدد وننقله للمستخدم.
-    """
     user_name = message.from_user.username
     available_accounts = get_accounts_for_sale()
+
+    if not available_accounts:
+        return bot.send_message(message.chat.id, "❌ لا توجد حسابات للبيع حالياً.")
 
     try:
         count_to_buy = int(message.text.strip())
@@ -447,16 +451,24 @@ def process_buy_accounts_count(message):
     if count_to_buy <= 0:
         return bot.send_message(message.chat.id, "❌ لا يمكن شراء عدد صفر أو أقل.")
     if count_to_buy > len(available_accounts):
-        return bot.send_message(message.chat.id, "❌ العدد المطلوب أكبر من المتوفر حالياً.")
+        return bot.send_message(message.chat.id,
+                                f"❌ العدد المطلوب ({count_to_buy}) أكبر من المتوفر حالياً ({len(available_accounts)}).")
 
-    # خذ أول count_to_buy حساب من القائمة
+    # خذ أول count_to_buy حساب
     purchased = available_accounts[:count_to_buy]
+    # احذفها من قائمة البيع
     remove_accounts_from_sale(purchased)
+    # أضفها للمستخدم
     for acc in purchased:
         add_allowed_user_account(user_name, acc)
 
-    bot.send_message(message.chat.id, "✅ تم شراء الحسابات التالية وإضافتها لحسابك:\n" 
-                                      + "\n".join(purchased))
+    # أظهر للمستخدم الأسماء أو لا حسب رغبتك
+    # إذا أردت عدم إظهار الأسماء:
+    # bot.send_message(message.chat.id, f"✅ تم شراء {count_to_buy} حسابات وإضافتها لحسابك.")
+    # أو إظهارها:
+    bought_text = "\n".join(purchased)
+    bot.send_message(message.chat.id,
+                     f"✅ تم شراء الحسابات التالية وإضافتها لحسابك:\n{bought_text}")
 
 # ----------------------------------
 # ================================
