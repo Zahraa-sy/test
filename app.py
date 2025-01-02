@@ -22,7 +22,7 @@ DB_NAME = "mydatabase"
 db = client[DB_NAME]
 
 admins_coll = db["admins"]                # لتخزين أسماء الأدمن
-allowed_users_coll = db["allowed_users"]  # لتخزين المستخدمين المسموح لهم وحساباتهم
+users_coll = db["users"]                  # تخزين بيانات المستخدم في مستند واحد { username: ..., accounts: [...] }
 accounts_for_sale_coll = db["accounts_for_sale"]  # لتخزين الحسابات المعروضة للبيع
 subscribers_coll = db["subscribers"]      # لتخزين أرقام الـchat_id للمشتركين
 
@@ -32,7 +32,8 @@ def init_db():
     وإنشاء قيود uniqueness حيث يلزم.
     """
     admins_coll.create_index("username", unique=True)
-    allowed_users_coll.create_index([("username", 1), ("account", 1)])
+    # نجعل username فريدًا (كل مستخدم له وثيقة واحدة):
+    users_coll.create_index("username", unique=True)
     accounts_for_sale_coll.create_index("account")
     subscribers_coll.create_index("chat_id", unique=True)
 
@@ -54,28 +55,71 @@ def remove_admin(username: str):
     """ حذف أدمن من القائمة. """
     admins_coll.delete_one({"username": username})
 
+# ========== دوال خاصة بالمستخدمين (users) ==========
+def create_user_if_not_exists(username: str):
+    """
+    ينشئ مستخدمًا جديدًا بهيكل أساسي إن لم يكن موجودًا.
+    {
+      "username": "someUser",
+      "accounts": []
+    }
+    """
+    user_doc = users_coll.find_one({"username": username})
+    if not user_doc:
+        users_coll.insert_one({
+            "username": username,
+            "accounts": []
+        })
 
-# ========== دوال خاصة بالمستخدمين المسموح لهم (allowed_users) ==========
 def add_allowed_user_account(username: str, account: str):
-    """ إضافة حساب واحد لمستخدم معيّن. """
-    allowed_users_coll.insert_one({"username": username, "account": account})
+    """
+    إضافة حساب واحد لمستخدم معيّن داخل قائمة accounts.
+    يخزن بشكل كائن {"account": account_string}
+    """
+    create_user_if_not_exists(username)
+    users_coll.update_one(
+        {"username": username},
+        {"$push": {"accounts": {"account": account}}}
+    )
 
 def get_allowed_accounts(username: str) -> list:
-    """ جلب جميع الحسابات المرتبطة بمستخدم معيّن. """
-    docs = allowed_users_coll.find({"username": username})
-    return [doc["account"] for doc in docs]
+    """
+    جلب جميع الحسابات المرتبطة بمستخدم معيّن.
+    يعيد قائمة سترينغ فقط (account) رغم أنها مخزنة ككائنات.
+    """
+    user_doc = users_coll.find_one({"username": username})
+    if not user_doc or "accounts" not in user_doc:
+        return []
+    return [acc_obj["account"] for acc_obj in user_doc["accounts"]]
 
 def delete_allowed_accounts(username: str, accounts: list = None):
     """
-    حذف حسابات من مستخدم معيّن.
-    إذا لم تُمرر قائمة حسابات أو كانت فارغة، يحذف جميع الحسابات للمستخدم.
+    حذف حسابات من مستخدم معيّن. 
+    - إذا لم تُمرر قائمة حسابات -> حذف كل شيء.
+    - إذا مررت قائمة -> حذف هذه الحسابات فقط.
     """
+    user_doc = users_coll.find_one({"username": username})
+    if not user_doc:
+        return
+
     if not accounts:
-        allowed_users_coll.delete_many({"username": username})
+        # احذف المستخدم كليًا أو على الأقل أفرغ قائمة accounts
+        users_coll.update_one(
+            {"username": username},
+            {"$set": {"accounts": []}}
+        )
     else:
         for acc in accounts:
-            allowed_users_coll.delete_one({"username": username, "account": acc})
+            users_coll.update_one(
+                {"username": username},
+                {"$pull": {"accounts": {"account": acc}}}
+            )
 
+def get_users_count() -> int:
+    """
+    إرجاع عدد المستخدمين (عدد الوثائق في users_coll)
+    """
+    return users_coll.count_documents({})
 
 # ========== دوال خاصة بالحسابات المعروضة للبيع (accounts_for_sale) ==========
 def add_account_for_sale(account: str):
@@ -97,7 +141,6 @@ def remove_accounts_from_sale(accounts: list):
     for acc in accounts:
         accounts_for_sale_coll.delete_one({"account": acc})
 
-
 # ========== دوال خاصة بالمشتركين (subscribers) ==========
 def add_subscriber(chat_id: int):
     """
@@ -115,10 +158,11 @@ def get_subscribers() -> list:
     docs = subscribers_coll.find()
     return [doc["chat_id"] for doc in docs]
 
+
 # ----------------------------------
 # إعداد البوت و Flask
 # ----------------------------------
-TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
+TOKEN = "ضع التوكن هنا"
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
@@ -242,6 +286,7 @@ def handle_request_async(chat_id, account, message_text):
         response = fetch_email_with_link(account, ["عضويتك في Netflix معلّقة"], "إضافة معلومات الدفع")
     else:
         response = "ليس لديك صلاحية لتنفيذ هذا الطلب."
+
     bot.send_message(chat_id, response)
 
 # ----------------------------------
@@ -251,8 +296,10 @@ def handle_request_async(chat_id, account, message_text):
 @bot.message_handler(commands=['start'])
 def start_message(message):
     telegram_username = clean_text(message.from_user.username)
-    user_accounts_list = get_allowed_accounts(telegram_username)
+    # إذا المستخدم غير موجود في الداتا، ننشئه بدون حسابات
+    create_user_if_not_exists(telegram_username)
 
+    user_accounts_list = get_allowed_accounts(telegram_username)
     if is_admin(telegram_username) or user_accounts_list:
         bot.send_message(message.chat.id, "يرجى إدخال اسم الحساب الذي ترغب في العمل عليه:")
         bot.register_next_step_handler(message, process_account_name)
@@ -283,21 +330,21 @@ def process_account_name(message):
                 types.KeyboardButton('عرض الحسابات للبيع'),
                 types.KeyboardButton('حذف حسابات من المعروضة للبيع'),
                 types.KeyboardButton('إرسال رسالة جماعية'),
-
                 types.KeyboardButton('إضافة مستخدم جديد'),
                 types.KeyboardButton('إضافة حسابات لمستخدم'),
                 types.KeyboardButton('حذف مستخدم مع جميع حساباته'),
                 types.KeyboardButton('حذف جزء من حسابات المستخدم'),
-                # (جديد) إضافة زر لإضافة مشترك
-                types.KeyboardButton('إضافة مشترك')  # <<=== زر جديد
+                types.KeyboardButton('إضافة مشترك'),
+                # (جديد) زر عرض عدد المستخدمين
+                types.KeyboardButton('عرض عدد المستخدمين')
             ])
-        # زر شراء حساب من القائمة المعروضة للبيع (مسموح أيضًا للمستخدم العادي)
         btns.append(types.KeyboardButton('شراء حساب من المعروضة للبيع'))
 
         markup.add(*btns)
         bot.send_message(message.chat.id, "اختر العملية المطلوبة:", reply_markup=markup)
     else:
         bot.send_message(message.chat.id, "اسم الحساب غير موجود ضمن الحسابات المصرح بها.")
+
 
 @bot.message_handler(func=lambda message: message.text in [
     'طلب رابط تحديث السكن',
@@ -326,6 +373,7 @@ def show_user_accounts(message):
     else:
         response = "❌ لا توجد حسابات مرتبطة بحسابك."
     bot.send_message(message.chat.id, response)
+
 
 # ----------------------------------
 # ================================
@@ -367,35 +415,48 @@ def process_accounts_removal(message):
     bot.send_message(message.chat.id, "✅ تم حذف الحسابات من قائمة البيع بنجاح.")
 
 # ----------------------------------
-# شراء حساب من المعروضة للبيع (مسموح للمستخدم العادي أيضًا)
+# شراء عدد معين من الحسابات (مسموح للمستخدم العادي)
 # ----------------------------------
 @bot.message_handler(func=lambda message: message.text == 'شراء حساب من المعروضة للبيع')
 def buy_account_from_sale_start(message):
-    bot.send_message(message.chat.id, "📝 أرسل الحسابات التي تريد شراءها (كل حساب في سطر):")
-    bot.register_next_step_handler(message, process_buy_accounts)
-
-def process_buy_accounts(message):
-    user_name = message.from_user.username
-    wanted_accounts = message.text.strip().split('\n')
+    """
+    بدلاً من إدخال الحسابات سطرًا بسطر، 
+    سنعرض له عدد الحسابات المتوفرة ونطلب منه إدخال عدد يريد شراءه.
+    """
     available_accounts = get_accounts_for_sale()
-    
-    purchased = []
-    not_found = []
+    if not available_accounts:
+        return bot.send_message(message.chat.id, "❌ لا توجد حسابات للبيع حالياً.")
+    # عرض عدد الحسابات المتاحة
+    bot.send_message(message.chat.id, f"يوجد حالياً {len(available_accounts)} حساب معروض للبيع.\n"
+                                      "كم عدد الحسابات التي ترغب بشرائها؟")
+    bot.register_next_step_handler(message, process_buy_accounts_count)
 
-    for acc in wanted_accounts:
-        acc_clean = acc.strip()
-        if acc_clean in available_accounts:
-            remove_accounts_from_sale([acc_clean])         
-            add_allowed_user_account(user_name, acc_clean) 
-            purchased.append(acc_clean)
-        else:
-            not_found.append(acc_clean)
+def process_buy_accounts_count(message):
+    """
+    يستلم عدد الحسابات التي يرغب المستخدم بشرائها.
+    ثم نأخذ من بداية قائمة البيع هذا العدد وننقله للمستخدم.
+    """
+    user_name = message.from_user.username
+    available_accounts = get_accounts_for_sale()
 
-    if purchased:
-        bot.send_message(message.chat.id, "✅ تم شراء الحسابات التالية وإضافتها لحسابك:\n" + "\n".join(purchased))
-    if not_found:
-        bot.send_message(message.chat.id, "❌ الحسابات التالية غير متوفرة في قائمة البيع:\n" + "\n".join(not_found))
+    try:
+        count_to_buy = int(message.text.strip())
+    except ValueError:
+        return bot.send_message(message.chat.id, "❌ الرجاء إدخال رقم صحيح.")
 
+    if count_to_buy <= 0:
+        return bot.send_message(message.chat.id, "❌ لا يمكن شراء عدد صفر أو أقل.")
+    if count_to_buy > len(available_accounts):
+        return bot.send_message(message.chat.id, "❌ العدد المطلوب أكبر من المتوفر حالياً.")
+
+    # خذ أول count_to_buy حساب من القائمة
+    purchased = available_accounts[:count_to_buy]
+    remove_accounts_from_sale(purchased)
+    for acc in purchased:
+        add_allowed_user_account(user_name, acc)
+
+    bot.send_message(message.chat.id, "✅ تم شراء الحسابات التالية وإضافتها لحسابك:\n" 
+                                      + "\n".join(purchased))
 
 # ----------------------------------
 # ================================
@@ -412,8 +473,10 @@ def add_new_user_with_accounts_start(message):
 
 def process_new_user(message):
     new_username = message.text.strip()
-    bot.send_message(message.chat.id, f"تم إنشاء المستخدم {new_username}.\n"
-                                      f"أرسل الحسابات التي تريد ربطها به (حساب في كل سطر):")
+    create_user_if_not_exists(new_username)
+    bot.send_message(message.chat.id,
+                     f"تم إنشاء المستخدم {new_username}.\n"
+                     f"أرسل الحسابات التي تريد ربطها به (حساب في كل سطر):")
     bot.register_next_step_handler(message, process_new_user_accounts, new_username)
 
 def process_new_user_accounts(message, new_username):
@@ -431,6 +494,7 @@ def add_accounts_to_existing_user_start(message):
 
 def process_add_accounts_step1(message):
     user_to_edit = message.text.strip()
+    create_user_if_not_exists(user_to_edit)
     bot.send_message(message.chat.id, f"أرسل الحسابات التي تريد إضافتها للمستخدم {user_to_edit} (حساب في كل سطر):")
     bot.register_next_step_handler(message, process_add_accounts_step2, user_to_edit)
 
@@ -449,8 +513,9 @@ def delete_user_all_accounts_start(message):
 
 def process_delete_user_all(message):
     user_to_delete = message.text.strip()
-    delete_allowed_accounts(user_to_delete)  # يحذف كل حساباته
-    bot.send_message(message.chat.id, f"✅ تم حذف المستخدم {user_to_delete} وجميع حساباته بنجاح.")
+    # نحذف كل حساباته
+    delete_allowed_accounts(user_to_delete)
+    bot.send_message(message.chat.id, f"✅ تم حذف الحسابات كلها من المستخدم {user_to_delete} بنجاح.")
 
 @bot.message_handler(func=lambda message: message.text == 'حذف جزء من حسابات المستخدم')
 def delete_part_of_user_accounts_start(message):
@@ -468,7 +533,7 @@ def process_delete_part_step1(message):
     bot.send_message(message.chat.id,
                      f"✅ لدى المستخدم {user_to_edit} الحسابات التالية:\n"
                      + "\n".join(current_accounts)
-                     + "\n📝 أرسل الحسابات التي تريد حذفها (حساب بكل سطر):")
+                     + "\n📝 أرسل الحسابات التي تريد حذفها (حساب في كل سطر):")
     bot.register_next_step_handler(message, process_delete_part_step2, user_to_edit)
 
 def process_delete_part_step2(message, user_to_edit):
@@ -499,6 +564,20 @@ def process_subscriber_id(message):
         bot.send_message(message.chat.id, f"✅ تم إضافة المشترك {chat_id_to_add} بنجاح إلى قائمة المشتركين.")
     except ValueError:
         bot.send_message(message.chat.id, "❌ الرجاء إدخال رقم صحيح للـ Chat ID.")
+
+# ----------------------------------
+# (جديد) زر عرض عدد المستخدمين
+# ----------------------------------
+@bot.message_handler(func=lambda message: message.text == "عرض عدد المستخدمين")
+def show_users_count(message):
+    """
+    للأدمن فقط: يعرض عدد المستخدمين المسجلين في كولكشن users
+    """
+    user_name = message.from_user.username
+    if not is_admin(user_name):
+        return bot.send_message(message.chat.id, "❌ أنت لست أدمن.")
+    count = get_users_count()
+    bot.send_message(message.chat.id, f"عدد المستخدمين المسجلين حالياً هو: {count}")
 
 # ----------------------------------
 # إرسال رسالة جماعية (للأدمن)
