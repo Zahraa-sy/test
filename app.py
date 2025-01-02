@@ -162,7 +162,7 @@ def get_subscribers() -> list:
 # ----------------------------------
 # إعداد البوت و Flask
 # ----------------------------------
-TOKEN = "ضع التوكن هنا"
+TOKEN = "7801426148:AAERaD89BYEKegqGSi8qSQ-Xooj8yJs41I4"
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
